@@ -122,6 +122,25 @@ namespace MedAtlas.Heart.EditorTools
             }
         }
 
+        public static void BuildWebGL()
+        {
+            EnsureAssets();
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.dataCaching = true;
+            PlayerSettings.productName = "MedAtlas - Сърце";
+            var opts = new BuildPlayerOptions
+            {
+                scenes = new[] { ScenePath },
+                locationPathName = "D:/tmp/heartweb",
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            };
+            var rep = BuildPipeline.BuildPlayer(opts);
+            File.WriteAllText("D:/tmp/heartweb_result.txt", rep.summary.result + " errors=" + rep.summary.totalErrors);
+            Debug.Log("HEART_WEBGL_RESULT " + rep.summary.result);
+        }
+
         public static void BuildWindowsTest()
         {
             EnsureAssets();

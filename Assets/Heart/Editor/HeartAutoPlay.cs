@@ -13,6 +13,12 @@ namespace MedAtlas.Heart.EditorTools
         {
             EditorApplication.delayCall += () =>
             {
+                if (File.Exists("Temp/heart_buildweb.flag") && !EditorApplication.isPlayingOrWillChangePlaymode)
+                {
+                    File.Delete("Temp/heart_buildweb.flag");
+                    HeartProjectSetup.BuildWebGL();
+                    return;
+                }
                 if (!File.Exists(Flag) || EditorApplication.isPlayingOrWillChangePlaymode) return;
                 File.Delete(Flag);
                 HeartProjectSetup.EnsureAssets();

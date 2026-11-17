@@ -54,7 +54,8 @@ namespace MedAtlas.Heart
             using (var br = new BinaryReader(new MemoryStream(ta.bytes)))
             {
                 var magic = Encoding.ASCII.GetString(br.ReadBytes(4));
-                if (magic != "HRT1") { Debug.LogError("bad heart model"); return; }
+                if (magic != "HRT1" && magic != "HRT2") { Debug.LogError("bad heart model"); return; }
+                packed = magic == "HRT2";
                 int n = br.ReadInt32();
                 bool first = true;
                 for (int i = 0; i < n; i++)
@@ -90,6 +91,15 @@ namespace MedAtlas.Heart
             }
         }
 
+        bool packed;
+
+        static short[] ReadI16(BinaryReader br, int n)
+        {
+            var b = br.ReadBytes(n * 2); var a = new short[n];
+            System.Buffer.BlockCopy(b, 0, a, 0, b.Length);
+            return a;
+        }
+
         static string ReadStr(BinaryReader br) { int n = br.ReadInt32(); return Encoding.UTF8.GetString(br.ReadBytes(n)); }
 
         static Vector3[] ReadV3(BinaryReader br, int n)
@@ -106,11 +116,35 @@ namespace MedAtlas.Heart
         {
             var p = new Part { Name = ReadStr(br), Cls = ReadStr(br) };
             int nv = br.ReadInt32(), nt = br.ReadInt32();
-            var pos = ReadV3(br, nv);
-            var nrm = ReadV3(br, nv);
-            var idxBytes = br.ReadBytes(nt * 3 * 4);
-            var idx = new int[nt * 3];
-            System.Buffer.BlockCopy(idxBytes, 0, idx, 0, idxBytes.Length);
+            Vector3[] pos, nrm; int[] idx;
+            if (!packed)
+            {
+                pos = ReadV3(br, nv);
+                nrm = ReadV3(br, nv);
+                var idxBytes = br.ReadBytes(nt * 3 * 4);
+                idx = new int[nt * 3];
+                System.Buffer.BlockCopy(idxBytes, 0, idx, 0, idxBytes.Length);
+            }
+            else
+            {
+                var mn = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                var mx = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle());
+                var range = mx - mn;
+                var qp = ReadI16(br, nv * 3);
+                pos = new Vector3[nv];
+                for (int i = 0; i < nv; i++)
+                    pos[i] = new Vector3(mn.x + (qp[i * 3] + 32768) / 65535f * range.x,
+                                         mn.y + (qp[i * 3 + 1] + 32768) / 65535f * range.y,
+                                         mn.z + (qp[i * 3 + 2] + 32768) / 65535f * range.z);
+                var qn = br.ReadBytes(nv * 3);
+                nrm = new Vector3[nv];
+                for (int i = 0; i < nv; i++)
+                    nrm[i] = new Vector3((sbyte)qn[i * 3], (sbyte)qn[i * 3 + 1], (sbyte)qn[i * 3 + 2]).normalized;
+                int isz = br.ReadByte();
+                idx = new int[nt * 3];
+                if (isz == 2) { var ib = br.ReadBytes(nt * 6); for (int i = 0; i < idx.Length; i++) idx[i] = ib[i * 2] | (ib[i * 2 + 1] << 8); }
+                else { var ib = br.ReadBytes(nt * 12); System.Buffer.BlockCopy(ib, 0, idx, 0, ib.Length); }
+            }
             var mesh = new Mesh { name = p.Name };
             if (nv > 65000) mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             mesh.vertices = pos; mesh.normals = nrm; mesh.triangles = idx;
@@ -118,7 +152,19 @@ namespace MedAtlas.Heart
             for (int k = 0; k < nk; k++)
             {
                 string kn = ReadStr(br);
-                var dp = ReadV3(br, nv); var dn = ReadV3(br, nv);
+                Vector3[] dp, dn;
+                if (!packed) { dp = ReadV3(br, nv); dn = ReadV3(br, nv); }
+                else
+                {
+                    float sp = br.ReadSingle() / 32767f, sn = br.ReadSingle() / 32767f;
+                    var qa = ReadI16(br, nv * 3); var qb = ReadI16(br, nv * 3);
+                    dp = new Vector3[nv]; dn = new Vector3[nv];
+                    for (int i = 0; i < nv; i++)
+                    {
+                        dp[i] = new Vector3(qa[i * 3], qa[i * 3 + 1], qa[i * 3 + 2]) * sp;
+                        dn[i] = new Vector3(qb[i * 3], qb[i * 3 + 1], qb[i * 3 + 2]) * sn;
+                    }
+                }
                 mesh.AddBlendShapeFrame(kn, 100f, dp, dn, null);
             }
             mesh.RecalculateBounds();
