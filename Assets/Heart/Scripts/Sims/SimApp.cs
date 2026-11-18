@@ -23,7 +23,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; ResponsiveLayout layout; bool focus;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -95,9 +95,9 @@ namespace MedAtlas.Sims
             var pack = PackFor(area, id);
             if (pack != null)
             {
-                var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>();
+                var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ);
                 StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d => { organ.Build(d); root.transform.position = -organ.Bounds.center; }));
-                orbit.Distance = 6.8f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                orbit.Distance = 5.6f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
                 return;
             }
             if (area == "Heart" || area == "Circulation")
@@ -105,14 +105,14 @@ namespace MedAtlas.Sims
                 var root = new GameObject("Heart"); heart = root.AddComponent<HeartModel>();
                 heartSim = new CardiacModel();
                 StartCoroutine(ModelFiles.Load("heart_model.wasm", d => { heart.Build(d); root.transform.position = -heart.Bounds.center; }));
-                orbit.Distance = 4.9f; orbit.Target = new Vector3(0, 0.05f, 0); orbit.Yaw = -12f;
+                orbit.Distance = 4.3f; orbit.Target = new Vector3(0, 0.05f, 0); orbit.Yaw = -12f;
             }
             else if (area == "Lungs")
             {
                 var root = new GameObject("Lungs"); lungs = root.AddComponent<LungAnatomy>();
                 lungSim = new LungModel();
                 StartCoroutine(ModelFiles.Load("lungs_model.wasm", d => { lungs.Build(d); root.transform.position = -lungs.Bounds.center; }));
-                orbit.Distance = 11f; orbit.MinDistance = 3f; orbit.MaxDistance = 22f; orbit.Target = new Vector3(0, -0.15f, 0);
+                orbit.Distance = 9.5f; orbit.MinDistance = 3f; orbit.MaxDistance = 22f; orbit.Target = new Vector3(0, -0.15f, 0);
             }
         }
 
@@ -197,6 +197,8 @@ namespace MedAtlas.Sims
             parBtn = UIKit.Button(bar, "Параметри", new Vector2(x0, 0), new Vector2(132, 44), () => ShowPanel(parPanel.gameObject.activeSelf ? null : parPanel)); x0 += 140;
             learnBtn = UIKit.Button(bar, "Учи", new Vector2(x0, 0), new Vector2(90, 44), () => ShowPanel(learnPanel.gameObject.activeSelf ? null : learnPanel)); x0 += 98;
             UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(100, 44), () => orbit.ResetView()); x0 += 108;
+            UIKit.Btn fb = null;
+            fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(116, 44), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 124;
             if (heart != null)
             {
                 UIKit.Btn ib = null;
@@ -213,7 +215,8 @@ namespace MedAtlas.Sims
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             var credit = UIKit.Label(C, "Физиологичен модел: medAtlas (същият като в уеб версията). Само за обучение.", 11, new Color(1, 1, 1, 0.3f), null, TextAnchor.LowerLeft);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
-            ResponsiveLayout.Attach(C, orbit);
+            layout = ResponsiveLayout.Attach(C, orbit);
+            layout.LandscapeOffsetX = 0.07f;
             LayoutCard();
         }
 
@@ -283,6 +286,16 @@ namespace MedAtlas.Sims
                     UIKit.LabelAt(gp, "Още: " + MiniJson.S(x2, "title"), 11, UIKit.TextDim, new Vector2(478, -310), new Vector2(226, 40));
                 }
             }
+        }
+
+        void ApplyFocus()
+        {
+            foreach (var n in new[] { "PhaseCard", "Stats", "Graphs" })
+            {
+                var t = C.Find(n); if (t != null) t.gameObject.SetActive(!focus);
+            }
+            orbit.ViewOffsetX = focus ? 0f : 0.07f;
+            orbit.DistanceScale = focus ? 0.8f : 1f;
         }
 
         void ShowPanel(RectTransform which)
@@ -529,6 +542,7 @@ namespace MedAtlas.Sims
 
         void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
         {
+            if (visuals != null) visuals.Tick(now, paused ? 0 : dt);
             if (organ != null && organ.Loaded)
             {
                 float a = Pick(now, null, float.NaN, "force", "F", "tension", "f");
@@ -537,9 +551,26 @@ namespace MedAtlas.Sims
             float phys = paused ? 0 : dt;
             if (heart != null && heart.Parts.Count > 0)
             {
-                float hr = Pick(now, stats, 72f, "hr", "rate");
-                heartSim.HeartRate = Mathf.Clamp(hr, 25f, 220f);
-                if (phys > 0) heartSim.Advance(phys);
+                if (now != null && now.ContainsKey("vLV"))
+                {
+                    // the original model drives the 3D heart: volumes, pressures and valve states
+                    float pLV = Pick(now, null, 0, "pLV"), pAo = Pick(now, null, 80, "pAo"), pLA = Pick(now, null, 8, "pLA");
+                    float pRV = Pick(now, null, 0, "pRV"), pPA = Pick(now, null, 15, "pPA"), pRA = Pick(now, null, 4, "pRA");
+                    heartSim.Vlv = Pick(now, null, 120, "vLV"); heartSim.Vrv = Pick(now, null, 120, "vRV");
+                    heartSim.Vla = 69f - Mathf.Clamp01((pLA - 4f) / 10f) * 30f;
+                    heartSim.Pao = pAo; heartSim.Ppa = pPA;
+                    float k = 1f - Mathf.Exp(-dt / 0.03f);
+                    heartSim.Mitral.Leaflet += ((pLA > pLV ? 1f : 0f) - heartSim.Mitral.Leaflet) * k;
+                    heartSim.Tricuspid.Leaflet += ((pRA > pRV ? 1f : 0f) - heartSim.Tricuspid.Leaflet) * k;
+                    heartSim.Aortic.Leaflet += ((Pick(now, null, 0, "qAo") > 1f ? 1f : 0f) - heartSim.Aortic.Leaflet) * k;
+                    heartSim.Pulmonary.Leaflet += ((pRV > pPA ? 1f : 0f) - heartSim.Pulmonary.Leaflet) * k;
+                }
+                else
+                {
+                    float hr = Pick(now, stats, 72f, "hr", "rate");
+                    heartSim.HeartRate = Mathf.Clamp(hr, 25f, 220f);
+                    if (phys > 0) heartSim.Advance(phys);
+                }
                 heart.Apply(heartSim);
             }
             if (lungs != null && lungs.Parts.Count > 0)

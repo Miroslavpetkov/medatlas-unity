@@ -122,7 +122,7 @@ namespace MedAtlas.Lungs
             if (solid.TryGetValue(cls, out var m)) return m;
             m = new Material(Resources.Load<Material>("Materials/Lit"));
             m.SetColor("_BaseColor", Colors.TryGetValue(cls, out var c) ? c : Color.gray);
-            m.SetFloat("_Smoothness", cls == "lobe" ? 0.55f : 0.5f);
+            m.SetFloat("_Smoothness", cls == "lobe" ? 0.35f : 0.5f);
             m.SetFloat("_Metallic", 0f);
             solid[cls] = m;
             if (cls == "pulmVein") veinMat = m;
@@ -160,7 +160,7 @@ namespace MedAtlas.Lungs
                     p.Renderer.enabled = true;
                     p.Renderer.sharedMaterial = p == highlighted ? highlightMat : p.Glass;
                 }
-                p.Renderer.shadowCastingMode = (on && (p.Cls == "lobe" || p.Cls == "heart")) ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
+                p.Renderer.receiveShadows = p.Cls != "lobe"; p.Renderer.shadowCastingMode = (p.Cls == "lobe" || (on && p.Cls == "heart")) ? UnityEngine.Rendering.ShadowCastingMode.Off : UnityEngine.Rendering.ShadowCastingMode.On;
                 p.Collider.enabled = p.Renderer.enabled;
             }
         }

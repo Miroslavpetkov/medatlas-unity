@@ -19,8 +19,9 @@ namespace MedAtlas.Heart
         RectTransform tabsRoot; UIKit.Btn[] tabs; int tab;
         bool? portrait;
         float distScale;
+        public float LandscapeOffsetX = 0f;
 
-        public static void Attach(Transform canvas, OrbitCamera orbit, float portraitDistanceScale = 1.35f)
+        public static ResponsiveLayout Attach(Transform canvas, OrbitCamera orbit, float portraitDistanceScale = 1.35f)
         {
             var l = canvas.gameObject.AddComponent<ResponsiveLayout>();
             l.scaler = canvas.GetComponent<CanvasScaler>(); l.orbit = orbit; l.distScale = portraitDistanceScale;
@@ -44,6 +45,7 @@ namespace MedAtlas.Heart
                 l.tabs[i] = UIKit.Button(l.tabsRoot, names[i], new Vector2(i * 350, 0), new Vector2(340, 56), () => { l.tab = k; l.UpdateTabs(); }, 22);
             }
             l.UpdateTabs();
+            return l;
         }
 
         void Save(RectTransform rt)
@@ -79,13 +81,13 @@ namespace MedAtlas.Heart
                 bool ov = (scen && scen.gameObject.activeSelf) || (par && par.gameObject.activeSelf);
                 if (card && !ov) card.gameObject.SetActive(true);
                 tabsRoot.gameObject.SetActive(false);
-                if (orbit) { orbit.DistanceScale = 1f; orbit.ViewOffsetY = 0f; }
+                if (orbit) { orbit.DistanceScale = 1f; orbit.ViewOffsetY = 0f; orbit.ViewOffsetX = LandscapeOffsetX; }
                 return;
             }
             scaler.referenceResolution = new Vector2(1080, 1920); scaler.matchWidthOrHeight = 0f;
             if (hint) hint.gameObject.SetActive(false);
             tabsRoot.gameObject.SetActive(true);
-            if (orbit) { orbit.DistanceScale = distScale; orbit.ViewOffsetY = 0.13f; }
+            if (orbit) { orbit.DistanceScale = distScale; orbit.ViewOffsetY = 0.13f; orbit.ViewOffsetX = 0f; }
 
             // control bar: wrap the buttons on rows of the screen width
             float x = 12, row = 0; const float BS = 1.2f, W = 1040 / BS, rowH = 56;

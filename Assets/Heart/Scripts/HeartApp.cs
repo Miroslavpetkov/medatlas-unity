@@ -133,7 +133,7 @@ namespace MedAtlas.Heart
             RenderSettings.skybox = null;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Custom;
             RenderSettings.customReflectionTexture = StudioCubemap();
-            RenderSettings.reflectionIntensity = 0.75f;
+            RenderSettings.reflectionIntensity = 0.3f;
 
             // post processing
             var volGo = new GameObject("Post Volume");

@@ -23,6 +23,8 @@ namespace MedAtlas.Sims
         readonly List<(SkinnedMeshRenderer r, int key)> contract = new List<(SkinnedMeshRenderer, int)>();
         readonly Dictionary<string, Material> mats = new Dictionary<string, Material>();
         public Bounds Bounds; public bool Loaded;
+        public class Part { public string Name, Cls; public Mesh Mesh; public Material Mat; public Color Base; }
+        public readonly List<Part> Parts = new List<Part>();
 
         public void Build(byte[] data)
         {
@@ -40,18 +42,106 @@ namespace MedAtlas.Sims
                     {
                         var smr = go.AddComponent<SkinnedMeshRenderer>(); smr.sharedMesh = mesh;
                         var b = mesh.bounds; b.Expand(0.3f); smr.localBounds = b;
-                        smr.sharedMaterial = Mat(cls);
+                        smr.sharedMaterial = PartMat(mesh, cls);
                         if (k >= 0) contract.Add((smr, k));
                     }
                     else
                     {
                         go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                        go.AddComponent<MeshRenderer>().sharedMaterial = Mat(cls);
+                        go.AddComponent<MeshRenderer>().sharedMaterial = PartMat(mesh, cls);
                     }
                     if (first) { Bounds = mesh.bounds; first = false; } else Bounds.Encapsulate(mesh.bounds);
                 }
             }
             Loaded = true;
+        }
+
+        /// <summary>Each part gets its own emission-capable material so it can light up with the physiology.</summary>
+        Material PartMat(Mesh mesh, string cls)
+        {
+            var m = new Material(Resources.Load<Material>("Materials/Highlight"));
+            var c = Colors.TryGetValue(cls, out var cc) ? cc : Color.gray;
+            m.SetColor("_BaseColor", c);
+            m.SetFloat("_Smoothness", cls == "bone" || cls == "cartilage" ? 0.35f : 0.55f);
+            m.SetFloat("_Metallic", 0f);
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", Color.black);
+            Parts.Add(new Part { Name = mesh.name, Cls = cls, Mesh = mesh, Mat = m, Base = c });
+            return m;
+        }
+
+        /// <summary>Light up the parts whose name contains any of the keys (intensity 0..1).</summary>
+        public void Glow(string[] keys, Color color, float intensity)
+        {
+            foreach (var p in Parts)
+            {
+                bool hit = false;
+                foreach (var k in keys) if (p.Name.IndexOf(k, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == k) { hit = true; break; }
+                if (hit) p.Mat.SetColor("_EmissionColor", color * Mathf.Clamp01(intensity) * 1.6f);
+            }
+        }
+
+        public void Tint(string[] keys, Color target, float k)
+        {
+            foreach (var p in Parts)
+                foreach (var key in keys)
+                    if (p.Name.IndexOf(key, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == key) { p.Mat.SetColor("_BaseColor", Color.Lerp(p.Base, target, Mathf.Clamp01(k))); break; }
+        }
+
+        // ---- flow of droplets along tube-like parts (urine in the ureters)
+        readonly List<List<Vector3>> flowPaths = new List<List<Vector3>>();
+        ParticleSystem flowPs; ParticleSystem.Particle[] flowBuf = new ParticleSystem.Particle[400];
+        readonly List<(int path, float s)> drops = new List<(int, float)>();
+
+        public void AddFlow(string key, Color color)
+        {
+            foreach (var p in Parts)
+            {
+                if (p.Name.IndexOf(key, System.StringComparison.OrdinalIgnoreCase) < 0) continue;
+                var v = new List<Vector3>(p.Mesh.vertices);
+                v.Sort((a, b) => b.y.CompareTo(a.y));
+                var path = new List<Vector3>();
+                int bins = 24; float top = v[0].y, bot = v[v.Count - 1].y;
+                for (int i = 0; i < bins; i++)
+                {
+                    float y0 = Mathf.Lerp(top, bot, i / (float)bins), y1 = Mathf.Lerp(top, bot, (i + 1) / (float)bins);
+                    Vector3 sum = Vector3.zero; int n = 0;
+                    foreach (var q in v) if (q.y <= y0 && q.y >= y1) { sum += q; n++; }
+                    if (n > 0) path.Add(sum / n);
+                }
+                if (path.Count > 1) flowPaths.Add(path);
+            }
+            if (flowPaths.Count == 0) return;
+            var go = new GameObject("Flow"); go.transform.SetParent(transform, false);
+            flowPs = go.AddComponent<ParticleSystem>(); flowPs.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = flowPs.main; main.simulationSpace = ParticleSystemSimulationSpace.Local; main.maxParticles = 400; main.playOnAwake = false; main.startLifetime = 1000f;
+            var em = flowPs.emission; em.enabled = false; var sh = flowPs.shape; sh.enabled = false;
+            var r = go.GetComponent<ParticleSystemRenderer>(); r.sharedMaterial = new Material(Resources.Load<Material>("Materials/Blood"));
+            var tex = new Texture2D(16, 16); for (int y = 0; y < 16; y++) for (int x = 0; x < 16; x++) { float dx = (x - 7.5f) / 8f, dy = (y - 7.5f) / 8f; tex.SetPixel(x, y, new Color(1, 1, 1, Mathf.Clamp01(1 - Mathf.Sqrt(dx * dx + dy * dy)))); }
+            tex.Apply(); r.sharedMaterial.SetTexture("_BaseMap", tex);
+            flowColor = color; flowPs.Play();
+        }
+        Color flowColor;
+
+        /// <param name="rate01">0..1 flow</param>
+        public void TickFlow(float dt, float rate01)
+        {
+            if (flowPs == null) return;
+            if (Random.value < rate01 * dt * 25f * flowPaths.Count && drops.Count < 380) drops.Add((Random.Range(0, flowPaths.Count), 0f));
+            int n = 0;
+            for (int i = drops.Count - 1; i >= 0; i--)
+            {
+                var d = drops[i]; d.s += dt * (0.25f + rate01 * 0.6f);
+                if (d.s >= 1f) { drops.RemoveAt(i); continue; }
+                drops[i] = d;
+            }
+            foreach (var d in drops)
+            {
+                var path = flowPaths[d.path]; float f = d.s * (path.Count - 1); int a = Mathf.Min((int)f, path.Count - 2);
+                flowBuf[n].position = Vector3.Lerp(path[a], path[a + 1], f - a);
+                flowBuf[n].startSize = 0.05f; flowBuf[n].startColor = flowColor; flowBuf[n].remainingLifetime = 100; flowBuf[n].startLifetime = 1000; n++;
+            }
+            flowPs.SetParticles(flowBuf, n);
         }
 
         Material Mat(string cls)
