@@ -247,8 +247,13 @@ namespace MedAtlas.Sims
             fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
             if (heart != null)
             {
-                UIKit.Btn ib = null;
-                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, H), () => { heart.SetInternalView(!heart.InternalView); ib.On = heart.InternalView; }); x0 += 190 + G;
+                // opacity of the heart walls, 1–100 (100 = solid)
+                var box = UIKit.Rect("Opacity", bar, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(x0, 0), new Vector2(300, H));
+                UIKit.PanelImage(box, UIKit.ButtonOff);
+                UIKit.LabelAt(box, "Плътност", 15, UIKit.TextMain, new Vector2(14, -12), new Vector2(90, 22), UIKit.SemiBold);
+                var val = UIKit.LabelAt(box, "100", 15, UIKit.Accent, new Vector2(244, -12), new Vector2(46, 22), UIKit.SemiBold, TextAnchor.UpperRight);
+                var sl = UIKit.Slider(box, new Vector2(104, 0), new Vector2(140, 20), 1, 100, 100, v => { heart.SetOpacity(v / 100f); val.text = Mathf.RoundToInt(v).ToString(); }, true);
+                x0 += 300 + G;
             }
             else if (lungs != null)
             {

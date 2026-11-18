@@ -12,6 +12,7 @@ namespace MedAtlas.Heart
         public class Part
         {
             public string Name, Cls, Bg, Latin;
+            public float GlassMin, GlassMax;
             public Mesh Mesh;
             public SkinnedMeshRenderer Renderer;
             public MeshCollider Collider;
@@ -242,6 +243,7 @@ namespace MedAtlas.Heart
             m.SetColor("_Color", c);
             m.SetFloat("_MinAlpha", minA);
             m.SetFloat("_MaxAlpha", maxA);
+            p.GlassMin = minA; p.GlassMax = maxA;
             // draw order: blood volumes first, shells after
             m.renderQueue = p.Cls == "cavity" ? 3000 : 3010;
             return m;
@@ -266,6 +268,26 @@ namespace MedAtlas.Heart
                     p.Renderer.shadowCastingMode = solidInside ? UnityEngine.Rendering.ShadowCastingMode.On : UnityEngine.Rendering.ShadowCastingMode.Off;
                 }
                 if (p.Collider) p.Collider.enabled = p.Renderer.enabled;
+            }
+        }
+
+        /// <summary>Opacity of the heart walls, 0.01–1 (slider 1–100). 1 = solid; below that the walls turn to glass,
+        /// more see-through the lower the value, and the valves, papillary muscles and blood inside become visible.</summary>
+        public float Opacity { get; private set; } = 1f;
+        public void SetOpacity(float o)
+        {
+            Opacity = Mathf.Clamp(o, 0.01f, 1f);
+            bool solid = Opacity >= 0.995f;
+            SetInternalView(!solid);
+            if (solid) return;
+            float k = Opacity;
+            foreach (var p in Parts)
+            {
+                if (p.Glass == null) continue;
+                bool cavity = p.Cls == "cavity";
+                float mn = cavity ? p.GlassMin : Mathf.Lerp(p.GlassMin * k * 2f, 0.92f, k * k);
+                float mx = cavity ? p.GlassMax : Mathf.Lerp(p.GlassMax * Mathf.Min(1f, k * 2.5f), 1f, k * k);
+                p.Glass.SetFloat("_MinAlpha", mn); p.Glass.SetFloat("_MaxAlpha", mx);
             }
         }
 
