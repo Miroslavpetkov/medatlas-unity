@@ -16,6 +16,9 @@ namespace MedAtlas.Heart
         float tYaw, tPitch, tDist; Vector3 tPan;
         float defYaw, defPitch, defDist;
         public System.Action<Vector2> OnTap;
+        /// <summary>Portrait layout: farther camera and the organ moved to the upper part of the screen.</summary>
+        public float DistanceScale = 1f, ViewOffsetY = 0f;
+        float curScale = 1f, curOff = 0f;
         Vector2 pressPos; float pressTime; bool dragging; bool pressOverUI;
 
         void Start()
@@ -93,7 +96,9 @@ namespace MedAtlas.Heart
             Yaw = Mathf.LerpAngle(Yaw, tYaw, s); Pitch = Mathf.Lerp(Pitch, tPitch, s); Distance = Mathf.Lerp(Distance, tDist, s);
             pan = Vector3.Lerp(pan, tPan, s);
             var rot = Quaternion.Euler(Pitch, Yaw, 0f);
-            transform.position = Target + pan + rot * new Vector3(0, 0, -Distance);
+            curScale = Mathf.Lerp(curScale, DistanceScale, s); curOff = Mathf.Lerp(curOff, ViewOffsetY, s);
+            float camD = Distance * curScale;
+            transform.position = Target + pan + rot * new Vector3(0, -curOff * camD, -camD);
             transform.rotation = rot;
         }
 

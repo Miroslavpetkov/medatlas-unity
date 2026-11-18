@@ -300,7 +300,7 @@ namespace MedAtlas.Heart
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(700, 20);
             var hint = UIKit.Label(C, "Плъзни – въртене · колелце / два пръста – мащаб · десен бутон – преместване · клик върху част – име", 13, new Color(1, 1, 1, 0.38f), null, TextAnchor.UpperLeft);
             var hrt = hint.rectTransform; hrt.anchorMin = hrt.anchorMax = new Vector2(0, 1); hrt.pivot = new Vector2(0, 1); hrt.anchoredPosition = new Vector2(46, -104); hrt.sizeDelta = new Vector2(900, 20);
-            PortraitHint.Add(C);
+            ResponsiveLayout.Attach(C, orbit);
         }
 
         void LayoutCard()

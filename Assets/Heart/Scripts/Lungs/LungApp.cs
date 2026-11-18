@@ -180,7 +180,7 @@ namespace MedAtlas.Lungs
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
 
             for (int i = 0; i <= 150; i++) o2Curve[i] = LungModel.Saturation(i, 7.4f, 37f, 40f, 0f, 0f);
-            PortraitHint.Add(C);
+            ResponsiveLayout.Attach(C, orbit);
         }
 
         TraceGraph Graph(RectTransform parent, Vector2 pos, Vector2 size)
