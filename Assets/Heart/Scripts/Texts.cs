@@ -68,6 +68,8 @@ namespace MedAtlas.Heart
             if (id == 2737) return ("Лява коронарна артерия (ствол)", "A. coronaria sinistra");
             if (id == 2724 || id == 2731) return ("Малка сърдечна вена", "V. cardiaca parva");
             if (id >= 2727 && id <= 2729) return ("Дясна маргинална вена", "V. marginalis dextra");
+            if (id >= 2678 && id <= 2691) return ("Средна сърдечна вена", "V. cardiaca media (v. interventricularis posterior)");
+            if (id >= 2701 && id <= 2713) return ("Задна вена на лявата камера", "V. ventriculi sinistri posterior");
             return ("Коронарен съд", "Vas coronarium");
         }
     }
