@@ -25,6 +25,9 @@ namespace MedAtlas.Sims
         void Start()
         {
             Application.targetFrameRate = 60;
+            var cla = System.Environment.GetCommandLineArgs();
+            if (System.Array.IndexOf(cla, "-organ") >= 0) { SceneManager.LoadScene("Sim"); return; }
+            if (System.Array.IndexOf(cla, "-lungs") >= 0) { SceneManager.LoadScene("Lungs"); return; }
             var camGo = new GameObject("Main Camera"); var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.028f, 0.03f, 0.038f);
             UIKit.Init();
@@ -64,7 +67,7 @@ namespace MedAtlas.Sims
                 {
                     string id = MiniJson.S(m, "id"); string title = MiniJson.S(m, "title");
                     bool rich = id == "cardiac-cycle" || id == "breathing";
-                    var b = UIKit.Button(content, title + (rich ? "   · 3D" : (a.area == "Heart" || a.area == "Circulation" || a.area == "Lungs") ? "   · 3D" : ""), Vector2.zero, new Vector2(560, 52), () => Open(id), 16);
+                    var b = UIKit.Button(content, title + (rich || a.area == "Heart" || a.area == "Circulation" || a.area == "Lungs" || SimApp.PackFor(a.area, id) != null ? "   · 3D" : ""), Vector2.zero, new Vector2(560, 52), () => Open(id), 16);
                     b.Text.alignment = TextAnchor.MiddleLeft; b.Text.rectTransform.offsetMin = new Vector2(16, 0); b.Text.rectTransform.offsetMax = new Vector2(-10, 0);
                     b.Text.horizontalOverflow = HorizontalWrapMode.Wrap; b.Text.resizeTextForBestFit = true; b.Text.resizeTextMinSize = 11; b.Text.resizeTextMaxSize = 16;
                     items.Add((b.Button.GetComponent<RectTransform>(), false, 56));

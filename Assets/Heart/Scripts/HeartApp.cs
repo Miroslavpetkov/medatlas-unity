@@ -71,6 +71,7 @@ namespace MedAtlas.Heart
             ready = true;
             var args = System.Environment.GetCommandLineArgs();
             if (System.Array.IndexOf(args, "-lungs") >= 0) { UnityEngine.SceneManagement.SceneManager.LoadScene("Lungs"); yield break; }
+            if (System.Array.IndexOf(args, "-organ") >= 0) { UnityEngine.SceneManagement.SceneManager.LoadScene("Sim"); yield break; }
             for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-autoshot") StartCoroutine(AutoShot(args[i + 1]));
         }
 

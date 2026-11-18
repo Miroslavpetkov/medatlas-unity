@@ -23,7 +23,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -42,6 +42,14 @@ namespace MedAtlas.Sims
             Application.targetFrameRate = 60;
             HeartApp.BuildStudio(out cam, out orbit);
             UIKit.Init();
+            var cl = System.Environment.GetCommandLineArgs();
+            int oi = System.Array.IndexOf(cl, "-organ");
+            if (oi >= 0 && oi + 1 < cl.Length)
+            {
+                Build3D(cl[oi + 1] == "brain" ? "Nerve" : "Kidney", "debug");
+                StartCoroutine(Shot(cl[System.Array.IndexOf(cl, "-autoshot") + 1]));
+                return;
+            }
             if (!PhysioBridge.Available) { BuildMessage("Тази симулация работи в уеб версията (линка). В Unity редактора са достъпни „Сърце“ и „Бели дробове“."); return; }
             def = MiniJson.O(MiniJson.Parse(PhysioBridge.Def(SelectedId)));
             if (def == null) { BuildMessage("Няма такава симулация: " + SelectedId); return; }
@@ -52,14 +60,46 @@ namespace MedAtlas.Sims
             handle = PhysioBridge.Create(SelectedId, MiniJson.Write(values));
             var speeds = MiniJson.L(def["speeds"]);
             if (speeds.Count > 0) speedK = (float)MiniJson.D(MiniJson.O(speeds[0]), "k", 1);
-            Build3D(MiniJson.S(def, "area"));
+            Build3D(MiniJson.S(def, "area"), SelectedId);
             BuildUI();
             ready = true;
         }
 
-        // ---------------------------------------------------------------- 3D
-        void Build3D(string area)
+        System.Collections.IEnumerator Shot(string dir)
         {
+            yield return new WaitForSeconds(4f);
+            System.IO.Directory.CreateDirectory(dir);
+            Debug.Log("ORGAN loaded=" + (organ != null && organ.Loaded) + " bounds=" + (organ != null ? organ.Bounds.ToString() : "-") + " children=" + (organ != null ? organ.transform.childCount : -1));
+            ScreenCapture.CaptureScreenshot(System.IO.Path.Combine(dir, "organ.png"));
+            yield return new WaitForSeconds(1f);
+            Application.Quit();
+        }
+
+        // ---------------------------------------------------------------- 3D
+        public static string PackFor(string area, string id)
+        {
+            switch (id)
+            {
+                case "muscle": return "arm";
+                case "smooth": case "adrenal": case "glucose-insulin": case "digestion": case "bilirubin": case "metabolism": case "nutrition": return "abdomen";
+                case "thyroid": case "calcium": return "neck";
+                case "cycle": case "testis": case "thermo": case "human": case "exercise": case "special": case "skin": return null;
+            }
+            if (area == "Nerve") return "brain";
+            if (area == "Kidney") return "kidney";
+            return null;
+        }
+
+        void Build3D(string area, string id)
+        {
+            var pack = PackFor(area, id);
+            if (pack != null)
+            {
+                var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>();
+                StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d => { organ.Build(d); root.transform.position = -organ.Bounds.center; }));
+                orbit.Distance = 6.8f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                return;
+            }
             if (area == "Heart" || area == "Circulation")
             {
                 var root = new GameObject("Heart"); heart = root.AddComponent<HeartModel>();
@@ -169,7 +209,7 @@ namespace MedAtlas.Sims
             }
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
-            if (heart == null && lungs == null)
+            if (heart == null && lungs == null && organ == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             var credit = UIKit.Label(C, "Физиологичен модел: medAtlas (същият като в уеб версията). Само за обучение.", 11, new Color(1, 1, 1, 0.3f), null, TextAnchor.LowerLeft);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
@@ -489,6 +529,11 @@ namespace MedAtlas.Sims
 
         void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
         {
+            if (organ != null && organ.Loaded)
+            {
+                float a = Pick(now, null, float.NaN, "force", "F", "tension", "f");
+                if (!float.IsNaN(a)) { actMax = Mathf.Max(actMax * 0.999f, Mathf.Abs(a)); organ.SetContraction(Mathf.Abs(a) / actMax); }
+            }
             float phys = paused ? 0 : dt;
             if (heart != null && heart.Parts.Count > 0)
             {
