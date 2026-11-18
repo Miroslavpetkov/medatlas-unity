@@ -19,6 +19,8 @@ namespace MedAtlas.Sims
         readonly List<(int path, float s, bool voidDrop)> dropState = new List<(int, float, bool)>();
         readonly List<(Transform t, Vector3 v, float life)> puffs = new List<(Transform, Vector3, float)>();
         bool ready; float lastFx;
+        /// <summary>0.01–1 from the "Плътност" slider; 0.35 keeps the default glass look.</summary>
+        public float Opacity = 0.35f;
 
         static readonly Color[] KindColor =
         {
@@ -162,7 +164,9 @@ namespace MedAtlas.Sims
                 }
             }
             // glowing organs
-            foreach (var g in glass) { g.M.SetColor("_Color", g.C); g.M.SetFloat("_MaxAlpha", g.A); }
+            float ok = Mathf.Clamp(Opacity, 0.01f, 1f);
+            float baseMin = Mathf.Lerp(0.03f * ok * 2f, 0.92f, ok * ok);
+            foreach (var g in glass) { g.M.SetColor("_Color", g.C); g.M.SetFloat("_MinAlpha", baseMin); g.M.SetFloat("_MaxAlpha", Mathf.Lerp(g.A * Mathf.Min(1f, ok * 2.5f), 1f, ok * ok)); }
             foreach (var kv in now)
             {
                 if (!kv.Key.StartsWith("G_") || !(kv.Value is double v)) continue;
@@ -172,7 +176,7 @@ namespace MedAtlas.Sims
                 {
                     if (g.Name.IndexOf(key, System.StringComparison.OrdinalIgnoreCase) < 0 && g.Cls != key) continue;
                     g.M.SetColor("_Color", Color.Lerp(g.C, new Color(1f, 0.78f, 0.4f), a * 0.6f) * (1f + 0.25f * a));
-                    g.M.SetFloat("_MaxAlpha", Mathf.Lerp(g.A, 0.62f, a));
+                    g.M.SetFloat("_MaxAlpha", Mathf.Max(g.M.GetFloat("_MaxAlpha"), Mathf.Lerp(g.A, 0.62f, a)));
                 }
             }
         }

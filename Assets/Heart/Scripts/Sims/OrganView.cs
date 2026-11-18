@@ -23,7 +23,7 @@ namespace MedAtlas.Sims
         readonly List<(SkinnedMeshRenderer r, int key)> contract = new List<(SkinnedMeshRenderer, int)>();
         readonly Dictionary<string, Material> mats = new Dictionary<string, Material>();
         public Bounds Bounds; public bool Loaded;
-        public class Part { public string Name, Cls; public Mesh Mesh; public Material Mat; public Color Base; }
+        public class Part { public string Name, Cls; public Mesh Mesh; public Material Mat, Glass; public Color Base; }
         public readonly List<Part> Parts = new List<Part>();
 
         public void Build(byte[] data)
@@ -184,6 +184,21 @@ namespace MedAtlas.Sims
             }
             mesh.RecalculateBounds();
             return (mesh, cls);
+        }
+
+        /// <summary>Opacity 0.01–1 (slider 1–100): 1 = solid organs, lower = X-ray glass.</summary>
+        public void SetOpacity(float o)
+        {
+            o = Mathf.Clamp(o, 0.01f, 1f);
+            foreach (Transform ch in transform)
+            {
+                var r = ch.GetComponent<Renderer>(); var p = Parts.Find(x => x.Name == ch.name);
+                if (r == null || p == null) continue;
+                if (o >= 0.995f) { r.sharedMaterial = p.Mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; continue; }
+                if (p.Glass == null) p.Glass = MedAtlas.Heart.Opacity.Glass(Color.Lerp(p.Base, Color.white, 0.25f));
+                MedAtlas.Heart.Opacity.Apply(p.Glass, o);
+                r.sharedMaterial = p.Glass; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
         }
 
         public void SetContraction(float a01)

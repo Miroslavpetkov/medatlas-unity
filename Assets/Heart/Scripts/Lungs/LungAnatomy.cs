@@ -165,6 +165,15 @@ namespace MedAtlas.Lungs
             }
         }
 
+        /// <summary>Opacity 0.01–1 (slider 1–100): 1 = solid lungs, lower = glass with the airways and vessels inside.</summary>
+        public void SetOpacity(float o)
+        {
+            o = Mathf.Clamp(o, 0.01f, 1f);
+            SetInternalView(o < 0.995f);
+            if (o >= 0.995f) return;
+            foreach (var p in Parts) if (p.Glass != null && p.Glass != p.Solid) MedAtlas.Heart.Opacity.Apply(p.Glass, o);
+        }
+
         public void Highlight(Part p) { highlighted = p; SetInternalView(InternalView); }
 
         public Part Pick(Ray ray)

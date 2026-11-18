@@ -35,7 +35,15 @@ namespace MedAtlas.Sims
         readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
         const int N = 400;
         float sampleDt = 0.004f; float curveTimer;
-        float statsH; float GraphW => MiniJson.L(def.ContainsKey("xy") ? def["xy"] : null).Count > 0 ? 720 : 620;
+        float statsH; float opacity = 1f; bool journeyPack;
+        void ApplyOpacity(float o)
+        {
+            opacity = o;
+            if (heart != null) heart.SetOpacity(o);
+            if (lungs != null) lungs.SetOpacity(o);
+            if (journey != null) journey.Opacity = o;
+            else if (organ != null && organ.Loaded && !journeyPack) organ.SetOpacity(o);
+        } float GraphW => MiniJson.L(def.ContainsKey("xy") ? def["xy"] : null).Count > 0 ? 720 : 620;
         bool ready;
 
         void Start()
@@ -118,15 +126,17 @@ namespace MedAtlas.Sims
             var pack = PackFor(area, id);
             if (pack != null)
             {
+                journeyPack = pack == "body";
                 var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ);
                 StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d =>
                 {
                     organ.Build(d); root.transform.position = -organ.Bounds.center;
+                    if (pack != "body" && opacity < 0.995f) organ.SetOpacity(opacity);
                     if (pack == "body" && organ.Loaded)
                     {
                         var fr = JourneyView.Framing(id); var b = organ.Bounds;
                         orbit.Target = new Vector3(0, (fr.yFrac - 0.5f) * b.size.y, 0); orbit.SetView(-18f, 6f, fr.dist);
-                        StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); }));
+                        StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); journey.Opacity = opacity; }));
                     }
                 }));
                 orbit.Distance = pack == "body" ? 6.4f : 5.6f; orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
@@ -245,20 +255,16 @@ namespace MedAtlas.Sims
             UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(110, H), () => orbit.ResetView()); x0 += 110 + G;
             UIKit.Btn fb = null;
             fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
-            if (heart != null)
+            if (heart != null || lungs != null || organ != null)
             {
-                // opacity of the heart walls, 1–100 (100 = solid)
+                // opacity of the organs, 1–100 (100 = solid); the body journeys start as glass so the food stays visible
+                float start = journeyPack ? 35 : 100; opacity = start / 100f;
                 var box = UIKit.Rect("Opacity", bar, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(x0, 0), new Vector2(300, H));
                 UIKit.PanelImage(box, UIKit.ButtonOff);
                 UIKit.LabelAt(box, "Плътност", 15, UIKit.TextMain, new Vector2(14, -12), new Vector2(90, 22), UIKit.SemiBold);
-                var val = UIKit.LabelAt(box, "100", 15, UIKit.Accent, new Vector2(244, -12), new Vector2(46, 22), UIKit.SemiBold, TextAnchor.UpperRight);
-                var sl = UIKit.Slider(box, new Vector2(104, 0), new Vector2(140, 20), 1, 100, 100, v => { heart.SetOpacity(v / 100f); val.text = Mathf.RoundToInt(v).ToString(); }, true);
+                var val = UIKit.LabelAt(box, Mathf.RoundToInt(start).ToString(), 15, UIKit.Accent, new Vector2(244, -12), new Vector2(46, 22), UIKit.SemiBold, TextAnchor.UpperRight);
+                UIKit.Slider(box, new Vector2(104, 0), new Vector2(140, 20), 1, 100, start, v => { val.text = Mathf.RoundToInt(v).ToString(); ApplyOpacity(v / 100f); }, true);
                 x0 += 300 + G;
-            }
-            else if (lungs != null)
-            {
-                UIKit.Btn ib = null;
-                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, H), () => { lungs.SetInternalView(!lungs.InternalView); ib.On = lungs.InternalView; }); x0 += 190 + G;
             }
             bar.sizeDelta = new Vector2(x0 + 4, 64);
 

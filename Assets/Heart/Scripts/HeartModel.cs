@@ -280,14 +280,10 @@ namespace MedAtlas.Heart
             bool solid = Opacity >= 0.995f;
             SetInternalView(!solid);
             if (solid) return;
-            float k = Opacity;
             foreach (var p in Parts)
             {
-                if (p.Glass == null) continue;
-                bool cavity = p.Cls == "cavity";
-                float mn = cavity ? p.GlassMin : Mathf.Lerp(p.GlassMin * k * 2f, 0.92f, k * k);
-                float mx = cavity ? p.GlassMax : Mathf.Lerp(p.GlassMax * Mathf.Min(1f, k * 2.5f), 1f, k * k);
-                p.Glass.SetFloat("_MinAlpha", mn); p.Glass.SetFloat("_MaxAlpha", mx);
+                if (p.Glass == null || p.Cls == "cavity") continue;
+                MedAtlas.Heart.Opacity.Apply(p.Glass, Opacity);
             }
         }
 
