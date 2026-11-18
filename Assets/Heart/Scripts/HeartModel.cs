@@ -191,7 +191,10 @@ namespace MedAtlas.Heart
 
             p.Solid = SolidFor(p);
             p.Glass = GlassFor(p);
-            p.InsideOnly = p.Cls == "cavity" || p.Cls == "mitral" || p.Cls == "tricuspid" || p.Cls == "aorticValve" || p.Cls == "pulmValve" || p.Cls == "papLV" || p.Cls == "papRV";
+            // the atrial walls of the source model are incomplete: the atrial blood casts close the gaps from outside
+            bool atrialCast = p.Name == "cavum_LA" || p.Name == "cavum_RA";
+            if (atrialCast) p.Solid = solidMats.TryGetValue("atrium", out var am) ? am : NewLit(SolidColors["atrium"], 0.68f);
+            p.InsideOnly = (p.Cls == "cavity" && !atrialCast) || p.Cls == "mitral" || p.Cls == "tricuspid" || p.Cls == "aorticValve" || p.Cls == "pulmValve" || p.Cls == "papLV" || p.Cls == "papRV";
             p.HideInside = p.Cls == "coronaryArtery" || p.Cls == "coronaryVein";
             return p;
         }

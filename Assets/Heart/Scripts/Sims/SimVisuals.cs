@@ -38,9 +38,9 @@ namespace MedAtlas.Sims
                 case "touch": G(new[] { "Postcentral", "Supramarginal" }, Hot, Mathf.Max(N(now, "pain"), N(now, "fast"))); break;
                 case "speech": G(new[] { "inferior frontal" }, Warm, N(now, "flu")); G(new[] { "Superior temporal", "Supramarginal" }, Cool, N(now, "comp")); break;
                 case "memory": G(new[] { "Medial occipitotemporal", "Parahippocampal" }, Warm, N(now, "stored")); G(new[] { "Superior frontal", "Middle frontal" }, Cool, N(now, "held")); break;
-                case "sleep": G(new[] { "cortex" }, Cool, N(now, "alert")); G(new[] { "Hypothalamus", "Thalamus" }, Warm, N(now, "mel")); break;
+                case "sleep": G(new[] { "cortex" }, Cool, N(now, "alert")); G(new[] { "hypophysis", "Thalamus" }, Warm, N(now, "mel")); break;
                 case "chemo": G(new[] { "Insula", "Orbital" }, Warm, Mathf.Max(N(now, "gust"), N(now, "smell"))); break;
-                case "ans": G(new[] { "Hypothalamus", "brainstem" }, Hot, N(now, "symp")); G(new[] { "Medulla" }, Cool, N(now, "para")); break;
+                case "ans": G(new[] { "hypophysis", "brainstem" }, Hot, N(now, "symp")); G(new[] { "Medulla" }, Cool, N(now, "para")); break;
                 case "vestibular": G(new[] { "cerebellum", "brainstem" }, Cool, N(now, "felt")); break;
                 case "reflex": G(new[] { "brainstem", "Precentral" }, Warm, N(now, "fExt")); break;
                 case "action-potential": case "synapse-receptors": G(new[] { "cortex" }, Warm, N(now, "v")); break;
@@ -59,8 +59,8 @@ namespace MedAtlas.Sims
                 case "metabolism": G(new[] { "Liver" }, Warm, N(now, "glyc")); break;
                 case "nutrition": G(new[] { "Liver" }, Warm, N(now, "alb")); break;
                 case "smooth": G(new[] { "Stomach" }, Hot, N(now, "f")); break;
-                case "cycle": G(new[] { "Hypothalamus" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
-                case "testis": G(new[] { "Hypothalamus" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
+                case "cycle": G(new[] { "hypophysis" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
+                case "testis": G(new[] { "hypophysis" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
