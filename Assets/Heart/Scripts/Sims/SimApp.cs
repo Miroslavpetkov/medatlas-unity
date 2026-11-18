@@ -23,7 +23,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; ResponsiveLayout layout; bool focus;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; ResponsiveLayout layout; bool focus; MicroScene micro;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -90,8 +90,26 @@ namespace MedAtlas.Sims
             return null;
         }
 
+        public static MicroScene.Kind? MicroFor(string id)
+        {
+            switch (id)
+            {
+                case "membrane": case "cardiac-ap": case "synapse-receptors": case "neuron-glia": case "signal": return MicroScene.Kind.Membrane;
+                case "action-potential": return MicroScene.Kind.Axon;
+                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "blood": case "bloodgroups": case "immune": case "acid-base": return MicroScene.Kind.Vessel;
+            }
+            return null;
+        }
+
         void Build3D(string area, string id)
         {
+            var mk = MicroFor(id);
+            if (mk != null)
+            {
+                var mroot = new GameObject("Micro"); micro = mroot.AddComponent<MicroScene>(); micro.Build(mk.Value, id);
+                orbit.Distance = 8.6f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
+                return;
+            }
             var pack = PackFor(area, id);
             if (pack != null)
             {
@@ -211,7 +229,7 @@ namespace MedAtlas.Sims
             }
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
-            if (heart == null && lungs == null && organ == null)
+            if (heart == null && lungs == null && organ == null && micro == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             var credit = UIKit.Label(C, "Физиологичен модел: medAtlas (същият като в уеб версията). Само за обучение.", 11, new Color(1, 1, 1, 0.3f), null, TextAnchor.LowerLeft);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
@@ -543,6 +561,7 @@ namespace MedAtlas.Sims
         void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
         {
             if (visuals != null) visuals.Tick(now, paused ? 0 : dt);
+            if (micro != null) micro.Tick(now, paused ? 0 : dt);
             if (organ != null && organ.Loaded)
             {
                 float a = Pick(now, null, float.NaN, "force", "F", "tension", "f");
