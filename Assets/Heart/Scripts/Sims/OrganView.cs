@@ -77,7 +77,7 @@ namespace MedAtlas.Sims
             {
                 bool hit = false;
                 foreach (var k in keys) if (p.Name.IndexOf(k, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == k) { hit = true; break; }
-                if (hit) p.Mat.SetColor("_EmissionColor", color * Mathf.Clamp01(intensity) * 1.6f);
+                if (hit) p.Mat.SetColor("_EmissionColor", color * Mathf.Clamp01(intensity) * 3.2f);
             }
         }
 
@@ -139,7 +139,7 @@ namespace MedAtlas.Sims
             {
                 var path = flowPaths[d.path]; float f = d.s * (path.Count - 1); int a = Mathf.Min((int)f, path.Count - 2);
                 flowBuf[n].position = Vector3.Lerp(path[a], path[a + 1], f - a);
-                flowBuf[n].startSize = 0.05f; flowBuf[n].startColor = flowColor; flowBuf[n].remainingLifetime = 100; flowBuf[n].startLifetime = 1000; n++;
+                flowBuf[n].startSize = 0.085f; flowBuf[n].startColor = flowColor; flowBuf[n].remainingLifetime = 100; flowBuf[n].startLifetime = 1000; n++;
             }
             flowPs.SetParticles(flowBuf, n);
         }

@@ -275,12 +275,14 @@ namespace MedAtlas.Heart
         // ------------- physiology -> geometry
         const float EDVref = 133f, ESVref = 52f, RvEDVref = 123f, RvESVref = 49f, LAmax = 69f, LAmin = 30f;
 
+        public float Amplify = 1.5f;   // movement shown larger than life so it is clearly visible
+
         public void Apply(CardiacModel m)
         {
             float wl = (EDVref - m.Vlv) / (EDVref - ESVref);
             float wr = (RvEDVref - m.Vrv) / (RvEDVref - RvESVref);
-            float wv = Mathf.Clamp((wl * 0.6f + wr * 0.4f), -0.3f, 1.3f);
-            float wa = Mathf.Clamp((LAmax - m.Vla) / (LAmax - LAmin), -0.2f, 1.2f);
+            float wv = Mathf.Clamp((wl * 0.6f + wr * 0.4f) * Amplify, -0.4f, 1.9f);
+            float wa = Mathf.Clamp((LAmax - m.Vla) / (LAmax - LAmin) * Amplify, -0.3f, 1.8f);
             float wao = Mathf.Clamp((m.Pao - 80f) / 40f, -0.3f, 1.4f);
             float wpa = Mathf.Clamp((m.Ppa - 12f) / 14f, -0.3f, 1.4f);
             foreach (var p in Parts)

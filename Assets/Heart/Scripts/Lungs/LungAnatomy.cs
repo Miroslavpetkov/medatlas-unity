@@ -177,7 +177,7 @@ namespace MedAtlas.Lungs
         /// <param name="volumeMl">lung volume above FRC</param>
         public void Apply(float volumeMl, float beat01, float sao2)
         {
-            float w = Mathf.Clamp(volumeMl / 750f, -0.2f, 2.2f);   // shown ~1.3× larger than life so it is visible
+            float w = Mathf.Clamp(volumeMl / 450f, -0.3f, 3f);   // shown ~2× larger than life so it is clearly visible
             foreach (var p in Parts)
             {
                 if (!p.Renderer.enabled) continue;
