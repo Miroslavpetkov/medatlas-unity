@@ -28,6 +28,9 @@ namespace MedAtlas.Heart
             defYaw = Yaw; defPitch = Pitch; defDist = Distance;
         }
 
+        /// <summary>Change the default view after start (e.g. once a model has loaded).</summary>
+        public void SetView(float yaw, float pitch, float dist) { defYaw = tYaw = yaw; defPitch = tPitch = pitch; defDist = tDist = dist; }
+
         public void ResetView() { tYaw = defYaw; tPitch = defPitch; tDist = defDist; tPan = Vector3.zero; }
 
         static bool OverUI(Vector2 screen)

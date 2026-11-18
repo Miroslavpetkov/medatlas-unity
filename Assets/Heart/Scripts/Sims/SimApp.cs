@@ -23,7 +23,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; ResponsiveLayout layout; bool focus; MicroScene micro;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; MicroScene micro;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -80,6 +80,7 @@ namespace MedAtlas.Sims
         {
             switch (id)
             {
+                case "food-journey": case "gas": case "swallow": case "water-journey": case "defecation": case "vomit": return "body";
                 case "muscle": return "arm";
                 case "smooth": case "adrenal": case "glucose-insulin": case "digestion": case "bilirubin": case "metabolism": case "nutrition": return "abdomen";
                 case "thyroid": case "calcium": return "neck";
@@ -117,8 +118,17 @@ namespace MedAtlas.Sims
             if (pack != null)
             {
                 var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ);
-                StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d => { organ.Build(d); root.transform.position = -organ.Bounds.center; }));
-                orbit.Distance = 5.6f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d =>
+                {
+                    organ.Build(d); root.transform.position = -organ.Bounds.center;
+                    if (pack == "body" && organ.Loaded)
+                    {
+                        var fr = JourneyView.Framing(id); var b = organ.Bounds;
+                        orbit.Target = new Vector3(0, (fr.yFrac - 0.5f) * b.size.y, 0); orbit.SetView(-18f, 6f, fr.dist);
+                        StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); }));
+                    }
+                }));
+                orbit.Distance = pack == "body" ? 6.4f : 5.6f; orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
                 return;
             }
             if (area == "Heart" || area == "Circulation")
@@ -565,6 +575,7 @@ namespace MedAtlas.Sims
         {
             if (visuals != null) visuals.Tick(now, paused ? 0 : dt);
             if (micro != null) micro.Tick(now, paused ? 0 : dt);
+            if (journey != null) journey.Tick(now, paused ? 0 : dt);
             if (organ != null && organ.Loaded)
             {
                 float a = Pick(now, null, float.NaN, "force", "F", "tension", "f");

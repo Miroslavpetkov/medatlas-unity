@@ -1,5 +1,7 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
-import { PHYSIO } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
+import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
+import { JOURNEYS } from './src/journeys';
+const PHYSIO: any[] = [...JOURNEYS, ...BASE];
 
 const bg = (t: any): any => (t && typeof t === 'object' && 'bg' in t ? t.bg : t);
 const find = (id: string) => PHYSIO.find((m) => m.id === id)!;

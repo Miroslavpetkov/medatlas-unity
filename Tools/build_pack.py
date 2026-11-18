@@ -33,6 +33,31 @@ for o in list(sc.objects):
         b.to_mesh(me); b.free()
     objs[o.name] = me
 print('MISSING', [n for n in CLS if n not in objs])
+# generated tubes for parts missing in Z-Anatomy (e.g. rectum): from the point of one part nearest to another part's centre
+import math
+for tb in spec.get('tubes', []):
+    A = objs[tb['from']]; B = objs[tb['to']]
+    cb = sum((v.co for v in B.vertices), Vector()) / len(B.vertices)
+    pa = min((v.co for v in A.vertices), key=lambda p: (p - cb).length)
+    ca = sum((v.co for v in A.vertices), Vector()) / len(A.vertices)
+    pa = pa + (pa - ca).normalized() * 0.0  # start at the surface end
+    end = cb + Vector(tb.get('endOffset', (0, 0, 0)))
+    ctrl = (pa + end) / 2 + Vector(tb.get('bend', (0, 0, 0)))
+    r0, r1 = tb['r0'], tb['r1']; N = 28; M = 20
+    bm = bmesh.new(); rings = []
+    def bez(t): return pa * (1 - t) ** 2 + ctrl * 2 * t * (1 - t) + end * t * t
+    for i in range(N + 1):
+        t = i / N; p = bez(t); tg = (bez(min(1, t + 0.01)) - bez(max(0, t - 0.01))).normalized()
+        u = tg.cross(Vector((1, 0, 0))); u = (u if u.length > 1e-3 else tg.cross(Vector((0, 1, 0)))).normalized(); w = tg.cross(u)
+        r = r0 + (r1 - r0) * t; r *= 1 + 0.35 * math.sin(math.pi * t)  # ampulla
+        rings.append([bm.verts.new(p + (u * math.cos(2 * math.pi * k / M) + w * math.sin(2 * math.pi * k / M)) * r) for k in range(M)])
+    for i in range(N):
+        for k in range(M):
+            bm.faces.new((rings[i][k], rings[i][(k + 1) % M], rings[i + 1][(k + 1) % M], rings[i + 1][k]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new(tb['name']); bm.to_mesh(me); bm.free()
+    objs[tb['name']] = me; CLS[tb['name']] = tb['cls']
+    print('TUBE', tb['name'], tuple(round(x, 3) for x in pa), tuple(round(x, 3) for x in end))
 
 allv = [v.co for me in objs.values() for v in me.vertices]
 mn = Vector((min(p.x for p in allv), min(p.y for p in allv), min(p.z for p in allv)))
@@ -79,4 +104,79 @@ with open(OUT, 'wb') as f:
             nn = normals(me, [p + d for p, d in zip(base, ds)])
             f.write(struct.pack('<%df' % (len(base) * 3), *[c for d in ds for c in D3(d)]))
             f.write(struct.pack('<%df' % (len(base) * 3), *[c for a, b in zip(nn, bn) for c in N3(a - b)]))
+# ---- optional centre-line paths through hollow organs (food journey, urine) for the simulations
+if spec.get('paths'):
+    import heapq
+    from mathutils import kdtree
+    def kd(me):
+        t = kdtree.KDTree(len(me.vertices))
+        for v in me.vertices: t.insert(v.co, v.index)
+        t.balance(); return t
+    def nearest_pair(a, b):
+        tb = kd(objs[b]); best = None
+        for v in list(objs[a].vertices)[::2]:
+            co, i, d = tb.find(v.co)
+            if best is None or d < best[0]: best = (d, v.co.copy(), co.copy())
+        return best[1], best[2]
+    def geodesic(me, p0, p1):
+        t = kd(me); s = t.find(p0)[1]; e = t.find(p1)[1]
+        adj = [[] for _ in me.vertices]
+        for ed in me.edges:
+            a, b = ed.vertices; w = (me.vertices[a].co - me.vertices[b].co).length; adj[a].append((b, w)); adj[b].append((a, w))
+        dist = {s: 0.0}; prev = {}; h = [(0.0, s)]
+        while h:
+            d, u = heapq.heappop(h)
+            if u == e: break
+            if d > dist.get(u, 1e9): continue
+            for v, w in adj[u]:
+                nd = d + w
+                if nd < dist.get(v, 1e9): dist[v] = nd; prev[v] = u; heapq.heappush(h, (nd, v))
+        path = [e]
+        while path[-1] != s and path[-1] in prev: path.append(prev[path[-1]])
+        return [me.vertices[i] for i in reversed(path)], t
+    def resample(pts, step):
+        out = [pts[0]]; acc = 0
+        for a, b in zip(pts, pts[1:]):
+            L = (b - a).length
+            while acc + L >= step and L > 0:
+                f = (step - acc) / L; a = a + (b - a) * f; L = (b - a).length; out.append(a.copy()); acc = 0
+            acc += L
+        if (out[-1] - pts[-1]).length > step * 0.3: out.append(pts[-1])
+        return out
+    def smooth(pts, n=3):
+        for _ in range(n):
+            pts = [pts[0]] + [(pts[i - 1] + pts[i] * 2 + pts[i + 1]) / 4 for i in range(1, len(pts) - 1)] + [pts[-1]]
+        return pts
+    def zslices(me, top_to_bottom=True, bins=14):
+        vs = [v.co for v in me.vertices]; z0 = max(v.z for v in vs); z1 = min(v.z for v in vs); out = []
+        for i in range(bins):
+            a = z0 + (z1 - z0) * i / bins; b = z0 + (z1 - z0) * (i + 1) / bins
+            sel = [v for v in vs if b <= v.z <= a]
+            if sel: out.append(sum(sel, Vector()) / len(sel))
+        return out if top_to_bottom else out[::-1]
+    allpaths = {}
+    for pname, segs in spec['paths'].items():
+        res = []; prev_end = None
+        for i, sg in enumerate(segs):
+            me = objs[sg['part']]
+            if sg.get('mode') == 'z':
+                pts = zslices(me, sg.get('down', True), sg.get('bins', 14))
+            else:
+                p0 = prev_end if prev_end is not None else Vector(sg['start'])
+                p1 = nearest_pair(sg['part'], segs[i + 1]['part'])[0] if i + 1 < len(segs) else Vector(sg['end'])
+                if sg.get('endPart'): p1 = nearest_pair(sg['part'], sg['endPart'])[0]
+                gv, tree = geodesic(me, p0, p1)
+                R = sg.get('r', 0.01); pts = []
+                for v in gv:
+                    if sg.get('mode') == 'centroid':
+                        near = [me.vertices[j].co for (co, j, d) in tree.find_range(v.co, R)]
+                        pts.append(sum(near, Vector()) / len(near))
+                    else:
+                        pts.append(v.co - v.normal * R)
+                pts = smooth(resample(pts, 0.004), 6)
+            prev_end = pts[-1]
+            res.append({'part': sg['part'], 'stage': sg['stage'], 'pts': [U3(p) for p in pts]})
+            print('PATH', pname, sg['part'], len(pts))
+        allpaths[pname] = res
+    json.dump(allpaths, open(OUT + '.paths.json', 'w', encoding='utf8'))
 print('EXPORTED', len(objs), sum(len(m.vertices) for m in objs.values()))

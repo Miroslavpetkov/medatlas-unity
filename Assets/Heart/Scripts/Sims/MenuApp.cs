@@ -13,11 +13,12 @@ namespace MedAtlas.Sims
     {
         static readonly (string area, string bg)[] Areas =
         {
-            ("Heart", "Сърце"), ("Circulation", "Кръвообращение"), ("Lungs", "Дишане"), ("Blood", "Кръв"),
+            ("Journey", "Пътят през тялото (НОВО)"), ("Heart", "Сърце"), ("Circulation", "Кръвообращение"), ("Lungs", "Дишане"), ("Blood", "Кръв"),
             ("Kidney", "Бъбреци, вода и соли"), ("Nerve", "Нервна система и сетива"), ("Muscle", "Мускули"),
             ("Metabolism", "Метаболизъм и хормони"), ("Body", "Цялото тяло"),
         };
 
+        static bool deepLinked;
         CanvasScaler scaler; RectTransform content, viewport;
         readonly List<(RectTransform rt, bool header, float h)> items = new List<(RectTransform, bool, float)>();
         bool? portrait;
@@ -28,6 +29,18 @@ namespace MedAtlas.Sims
             var cla = System.Environment.GetCommandLineArgs();
             if (System.Array.IndexOf(cla, "-organ") >= 0) { SceneManager.LoadScene("Sim"); return; }
             if (System.Array.IndexOf(cla, "-lungs") >= 0) { SceneManager.LoadScene("Lungs"); return; }
+            // shareable deep link: ...index.html?sim=<id> opens that simulation directly (once per page load)
+            if (!deepLinked)
+            {
+                deepLinked = true;
+                string url = Application.absoluteURL ?? ""; int k = url.IndexOf("sim=");
+                if (k >= 0)
+                {
+                    string id = url.Substring(k + 4); int e = id.IndexOfAny(new[] { '&', '#' }); if (e >= 0) id = id.Substring(0, e);
+                    id = UnityEngine.Networking.UnityWebRequest.UnEscapeURL(id);
+                    if (id.Length > 0) { Open(id); return; }
+                }
+            }
             var camGo = new GameObject("Main Camera"); var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = new Color(0.028f, 0.03f, 0.038f);
             UIKit.Init();
