@@ -83,7 +83,8 @@ namespace MedAtlas.Sims
                 case "muscle": return "arm";
                 case "smooth": case "adrenal": case "glucose-insulin": case "digestion": case "bilirubin": case "metabolism": case "nutrition": return "abdomen";
                 case "thyroid": case "calcium": return "neck";
-                case "cycle": case "testis": case "thermo": case "human": case "exercise": case "special": case "skin": return null;
+                case "cycle": case "testis": return "brain";
+                case "thermo": case "human": case "exercise": case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
             if (area == "Kidney") return "kidney";
@@ -96,7 +97,7 @@ namespace MedAtlas.Sims
             {
                 case "membrane": case "cardiac-ap": case "synapse-receptors": case "neuron-glia": case "signal": return MicroScene.Kind.Membrane;
                 case "action-potential": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "blood": case "bloodgroups": case "immune": case "acid-base": return MicroScene.Kind.Vessel;
+                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "blood": case "bloodgroups": case "immune": case "acid-base": case "thermo": case "skin": return MicroScene.Kind.Vessel;
             }
             return null;
         }
@@ -110,6 +111,8 @@ namespace MedAtlas.Sims
                 orbit.Distance = 8.6f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
                 return;
             }
+            if (id == "human" || id == "exercise") area = "Heart";
+            if (id == "special") area = "Lungs";
             var pack = PackFor(area, id);
             if (pack != null)
             {

@@ -59,6 +59,8 @@ namespace MedAtlas.Sims
                 case "metabolism": G(new[] { "Liver" }, Warm, N(now, "glyc")); break;
                 case "nutrition": G(new[] { "Liver" }, Warm, N(now, "alb")); break;
                 case "smooth": G(new[] { "Stomach" }, Hot, N(now, "f")); break;
+                case "cycle": G(new[] { "Hypothalamus" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
+                case "testis": G(new[] { "Hypothalamus" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
