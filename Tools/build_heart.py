@@ -114,6 +114,21 @@ la_c = sum((v.co for v in objs['cavum_LA'].data.vertices), Vector()) / len(objs[
 names = {}
 left = sorted([o for o in ostia if o[0].x > la_c.x], key=lambda t: -t[0].z)
 right = sorted([o for o in ostia if o[0].x <= la_c.x], key=lambda t: -t[0].z)
+# superior and inferior vein of each side lie one above the other on the back of the atrium:
+# put them on the wall around the pair's centre, 9 mm above and below
+from mathutils.bvhtree import BVHTree
+_bm = bmesh.new(); _bm.from_mesh(la.data); _bvh = BVHTree.FromBMesh(_bm); _bm.free()
+def stacked(pair):
+    if len(pair) < 2: return pair
+    cm = (pair[0][0] + pair[1][0]) / 2; rr = (pair[0][1] + pair[1][1]) / 2
+    out = []
+    for dz in (9.0, -9.0):
+        tgt = cm + Vector((0, 0, dz))
+        hit = _bvh.find_nearest(tgt)
+        out.append((hit[0] if hit and hit[0] is not None else tgt, rr))
+    return out
+left = stacked(left); right = stacked(right)
+print('PV stacked', [(tuple(round(x, 1) for x in c), round(r, 1)) for c, r in left + right])
 for (c, r), nm in list(zip(left, ['vv_pulm_2', 'vv_pulm_5'])) + list(zip(right, ['vv_pulm_6', 'vv_pulm_7'])):
     # short stumps (~1.5 cm) leaving the back of the left atrium towards the hilum of each lung:
     # mostly lateral, a little posterior; the superior veins rise slightly, the inferior run horizontally
