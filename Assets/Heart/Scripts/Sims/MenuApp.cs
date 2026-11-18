@@ -77,8 +77,6 @@ namespace MedAtlas.Sims
 
         static void Open(string id)
         {
-            if (id == "cardiac-cycle") { SceneManager.LoadScene("Heart"); return; }
-            if (id == "breathing") { SceneManager.LoadScene("Lungs"); return; }
             SimApp.SelectedId = id; SceneManager.LoadScene("Sim");
         }
 

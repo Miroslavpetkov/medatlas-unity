@@ -143,18 +143,18 @@ namespace MedAtlas.Heart
             AddPath(Concat(ivc, RightTail(true)), false, 0.32f);
             AddPath(Concat(ivc, RightTail(false)), false, 0.32f);
 
-            string[] leftVeins = { "vv_pulm_1", "vv_pulm_2", "vv_pulm_3", "vv_pulm_5" };
+            string[] leftVeins = { "vv_pulm_2", "vv_pulm_5" };
             string[] rightVeins = { "vv_pulm_6", "vv_pulm_7" };
             int k = 0;
             foreach (var v in leftVeins)
             {
                 var head = new List<(Vector3, Drv, float, Gate)> { (L(v + "_xmax"), Drv.Pv, 0.035f, Gate.None), (L(v), Drv.Pv, 0.04f, Gate.None) };
-                AddPath(Concat(head, LeftTail(0)), true, 1f / 6f); k++;
+                AddPath(Concat(head, LeftTail(0)), true, 0.25f); k++;
             }
             foreach (var v in rightVeins)
             {
                 var head = new List<(Vector3, Drv, float, Gate)> { (L(v + "_xmin"), Drv.Pv, 0.035f, Gate.None), (L(v), Drv.Pv, 0.04f, Gate.None) };
-                AddPath(Concat(head, LeftTail(0)), true, 1f / 6f);
+                AddPath(Concat(head, LeftTail(0)), true, 0.25f);
             }
         }
 
