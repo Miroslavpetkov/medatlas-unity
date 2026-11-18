@@ -6,7 +6,7 @@ namespace MedAtlas.Heart
     /// <summary>Top tabs to switch between the simulations (scenes "Heart" and "Lungs").</summary>
     public static class SceneTabs
     {
-        static readonly (string scene, string label)[] Tabs = { ("Heart", "Сърце"), ("Lungs", "Бели дробове") };
+        static readonly (string scene, string label)[] Tabs = { ("Menu", "Каталог"), ("Heart", "Сърце"), ("Lungs", "Бели дробове") };
 
         public static void Add(Transform canvas, string current)
         {

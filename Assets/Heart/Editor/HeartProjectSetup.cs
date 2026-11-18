@@ -12,6 +12,9 @@ namespace MedAtlas.Heart.EditorTools
     {
         public const string ScenePath = "Assets/Heart/Scenes/Heart.unity";
         public const string LungsScenePath = "Assets/Heart/Scenes/Lungs.unity";
+        public const string MenuScenePath = "Assets/Heart/Scenes/Menu.unity";
+        public const string SimScenePath = "Assets/Heart/Scenes/Sim.unity";
+        static string[] AllScenes => new[] { MenuScenePath, ScenePath, LungsScenePath, SimScenePath };
         const string MatDir = "Assets/Heart/Resources/Materials";
         const string PrefKey = "MedAtlas.Heart.SceneOpened.v1";
 
@@ -45,8 +48,10 @@ namespace MedAtlas.Heart.EditorTools
             if (!File.Exists(ScenePath)) CreateScene();
             if (!File.Exists(LungsScenePath)) CreateLungsScene();
             var scenes = EditorBuildSettings.scenes;
-            if (scenes.Length < 2 || scenes[0].path != ScenePath || scenes[1].path != LungsScenePath)
-                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true), new EditorBuildSettingsScene(LungsScenePath, true) };
+            if (!File.Exists(MenuScenePath)) CreateAppScene<MedAtlas.Sims.MenuApp>(MenuScenePath, "MenuApp");
+            if (!File.Exists(SimScenePath)) CreateAppScene<MedAtlas.Sims.SimApp>(SimScenePath, "SimApp");
+            if (scenes.Length != 4 || scenes[0].path != MenuScenePath)
+                EditorBuildSettings.scenes = System.Array.ConvertAll(AllScenes, p => new EditorBuildSettingsScene(p, true));
         }
 
         static void EnsureMaterials()
@@ -102,6 +107,16 @@ namespace MedAtlas.Heart.EditorTools
             AssetDatabase.Refresh();
         }
 
+        static void CreateAppScene<T>(string path, string name) where T : Component
+        {
+            var prev = SceneManager.GetActiveScene().path;
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            new GameObject(name).AddComponent<T>();
+            EditorSceneManager.SaveScene(scene, path);
+            AssetDatabase.Refresh();
+            if (!string.IsNullOrEmpty(prev) && File.Exists(prev)) EditorSceneManager.OpenScene(prev);
+        }
+
         static void CreateLungsScene()
         {
             var prev = SceneManager.GetActiveScene().path;
@@ -144,7 +159,7 @@ namespace MedAtlas.Heart.EditorTools
             PlayerSettings.productName = "MedAtlas - Сърце";
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath, LungsScenePath },
+                scenes = AllScenes,
                 locationPathName = "D:/tmp/heartweb",
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
@@ -161,7 +176,7 @@ namespace MedAtlas.Heart.EditorTools
             EnsureAssets();
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath, LungsScenePath },
+                scenes = AllScenes,
                 locationPathName = BuildOut,
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.None

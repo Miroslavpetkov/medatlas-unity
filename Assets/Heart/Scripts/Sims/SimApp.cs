@@ -1,0 +1,511 @@
+using System.Collections.Generic;
+using System.Globalization;
+using MedAtlas.Heart;
+using MedAtlas.Lungs;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
+using D = System.Collections.Generic.Dictionary<string, object>;
+
+namespace MedAtlas.Sims
+{
+    /// <summary>Generic simulation screen for any medAtlas physiology model (scene "Sim"):
+    /// phase card, scenarios, parameters, actions, values, strip charts, XY plots, key ideas, and a 3D organ
+    /// for the heart / circulation and lung models.</summary>
+    public class SimApp : MonoBehaviour
+    {
+        public static string SelectedId = "blood-pressure";
+        static readonly CultureInfo CI = CultureInfo.InvariantCulture;
+
+        D def; int handle = -1; Dictionary<string, object> values;
+        string presetId;
+        float speedK = 1; bool paused;
+        Camera cam; OrbitCamera orbit;
+        // 3D
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim;
+        // UI
+        RectTransform card, scenPanel, parPanel, learnPanel;
+        Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
+        Image phaseDot;
+        UIKit.Btn pauseBtn, scenBtn, parBtn, learnBtn; readonly List<UIKit.Btn> speedBtns = new List<UIKit.Btn>();
+        readonly List<System.Action> sync = new List<System.Action>();
+        class Strip { public TraceGraph g; public List<string> ch = new List<string>(); public List<float[]> buf = new List<float[]>(); public float window, acc; public Text legend; }
+        class XY { public TraceGraph g; public string x, y; public float trail; public float[] bx, by; public int n; public TraceGraph.Series curve; public bool hasCurve; public int index; }
+        readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
+        const int N = 400;
+        float sampleDt = 0.004f; float curveTimer;
+        bool ready;
+
+        void Start()
+        {
+            Application.targetFrameRate = 60;
+            HeartApp.BuildStudio(out cam, out orbit);
+            UIKit.Init();
+            if (!PhysioBridge.Available) { BuildMessage("Тази симулация работи в уеб версията (линка). В Unity редактора са достъпни „Сърце“ и „Бели дробове“."); return; }
+            def = MiniJson.O(MiniJson.Parse(PhysioBridge.Def(SelectedId)));
+            if (def == null) { BuildMessage("Няма такава симулация: " + SelectedId); return; }
+            sampleDt = (float)MiniJson.D(def, "sampleDt", 0.004);
+            values = new D(MiniJson.O(def["defaults"]));
+            var presets = MiniJson.L(def["presets"]);
+            if (presets.Count > 0) { var p0 = MiniJson.O(presets[0]); presetId = MiniJson.S(p0, "id"); foreach (var kv in MiniJson.O(p0["values"])) values[kv.Key] = kv.Value; }
+            handle = PhysioBridge.Create(SelectedId, MiniJson.Write(values));
+            var speeds = MiniJson.L(def["speeds"]);
+            if (speeds.Count > 0) speedK = (float)MiniJson.D(MiniJson.O(speeds[0]), "k", 1);
+            Build3D(MiniJson.S(def, "area"));
+            BuildUI();
+            ready = true;
+        }
+
+        // ---------------------------------------------------------------- 3D
+        void Build3D(string area)
+        {
+            if (area == "Heart" || area == "Circulation")
+            {
+                var root = new GameObject("Heart"); heart = root.AddComponent<HeartModel>();
+                heartSim = new CardiacModel();
+                StartCoroutine(ModelFiles.Load("heart_model.wasm", d => { heart.Build(d); root.transform.position = -heart.Bounds.center; }));
+                orbit.Distance = 4.9f; orbit.Target = new Vector3(0, 0.05f, 0); orbit.Yaw = -12f;
+            }
+            else if (area == "Lungs")
+            {
+                var root = new GameObject("Lungs"); lungs = root.AddComponent<LungAnatomy>();
+                lungSim = new LungModel();
+                StartCoroutine(ModelFiles.Load("lungs_model.wasm", d => { lungs.Build(d); root.transform.position = -lungs.Bounds.center; }));
+                orbit.Distance = 11f; orbit.MinDistance = 3f; orbit.MaxDistance = 22f; orbit.Target = new Vector3(0, -0.15f, 0);
+            }
+        }
+
+        // ---------------------------------------------------------------- UI
+        Transform C;
+
+        void BuildCanvas()
+        {
+            if (FindFirstObjectByType<EventSystem>() == null) { var es = new GameObject("EventSystem"); es.AddComponent<EventSystem>(); es.AddComponent<InputSystemUIInputModule>(); }
+            var bgGo = new GameObject("BackdropCanvas"); var bgc = bgGo.AddComponent<Canvas>();
+            bgc.renderMode = RenderMode.ScreenSpaceCamera; bgc.worldCamera = cam; bgc.planeDistance = 60f; bgc.sortingOrder = -100;
+            var bgr = UIKit.Rect("bg", bgGo.transform, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            var raw = bgr.gameObject.AddComponent<RawImage>(); raw.texture = HeartApp.RadialTexture(); raw.raycastTarget = false;
+            var cgo = new GameObject("UI"); var canvas = cgo.AddComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 10;
+            var sc = cgo.AddComponent<CanvasScaler>(); sc.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; sc.referenceResolution = new Vector2(1920, 1080); sc.matchWidthOrHeight = 0.6f;
+            cgo.AddComponent<GraphicRaycaster>();
+            C = cgo.transform;
+        }
+
+        void BuildMessage(string msg)
+        {
+            BuildCanvas();
+            SceneTabs.Add(C, "Sim");
+            UIKit.LabelAt(C, msg, 26, UIKit.TextMain, new Vector2(60, -200), new Vector2(1200, 200), UIKit.SemiBold);
+        }
+
+        static Color Hex(string h, Color fallback)
+        {
+            if (!string.IsNullOrEmpty(h) && ColorUtility.TryParseHtmlString(h, out var c)) return c;
+            return fallback;
+        }
+
+        string Fmt(double v, int dp) => v.ToString(dp <= 0 ? "0" : "0." + new string('0', dp), CI).Replace('.', ',');
+
+        void BuildUI()
+        {
+            BuildCanvas();
+            string title = MiniJson.S(def, "title");
+            UIKit.LabelAt(C, "Физиология", 38, UIKit.TextMain, new Vector2(44, -30), new Vector2(320, 50), UIKit.SemiBold);
+            SceneTabs.Add(C, "Sim");
+            var t = UIKit.LabelAt(C, title, 19, UIKit.TextDim, new Vector2(46, -80), new Vector2(1100, 26), UIKit.Italic);
+            var hint = UIKit.LabelAt(C, "Плъзни – въртене · колелце / два пръста – мащаб · десен бутон – преместване", 13, new Color(1, 1, 1, 0.38f), new Vector2(46, -104), new Vector2(900, 20));
+
+            // phase card
+            card = UIKit.Rect("PhaseCard", C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -128), new Vector2(450, 300));
+            UIKit.PanelImage(card, UIKit.Panel);
+            scenTitle = UIKit.LabelAt(card, "", 14, new Color(0.55f, 0.85f, 1f), Vector2.zero, new Vector2(404, 22), UIKit.SemiBold);
+            scenText = UIKit.LabelAt(card, "", 14, new Color(0.75f, 0.85f, 0.95f), Vector2.zero, new Vector2(404, 60), UIKit.Italic);
+            phaseDot = UIKit.Dot(card, Vector2.zero, 12, Color.white);
+            phaseTitle = UIKit.LabelAt(card, "", 22, UIKit.TextMain, Vector2.zero, new Vector2(380, 30), UIKit.SemiBold);
+            phaseText = UIKit.LabelAt(card, "", 15, new Color(0.84f, 0.85f, 0.88f), Vector2.zero, new Vector2(404, 100));
+
+            // stats
+            var statsDef = MiniJson.L(def["stats"]);
+            var stats = UIKit.Rect("Stats", C, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-36, -30), new Vector2(380, 30 + statsDef.Count * 19));
+            UIKit.PanelImage(stats, UIKit.Panel);
+            var sb = new System.Text.StringBuilder();
+            foreach (var o in statsDef) sb.Append(MiniJson.S(MiniJson.O(o), "label")).Append('\n');
+            statsLabels = UIKit.LabelAt(stats, sb.ToString(), 13, UIKit.TextDim, new Vector2(18, -14), new Vector2(240, statsDef.Count * 19 + 10));
+            statsLabels.lineSpacing = 1.12f;
+            statsValues = UIKit.LabelAt(stats, "", 13, UIKit.TextMain, new Vector2(200, -14), new Vector2(162, statsDef.Count * 19 + 10), UIKit.SemiBold, TextAnchor.UpperRight);
+            statsValues.lineSpacing = 1.12f; statsValues.supportRichText = true;
+
+            // charts
+            BuildCharts();
+
+            // controls
+            var bar = UIKit.Rect("Controls", C, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(36, 30), new Vector2(1848, 64));
+            UIKit.PanelImage(bar, UIKit.Panel);
+            float x0 = 14;
+            pauseBtn = UIKit.Button(bar, "Пауза", new Vector2(x0, 0), new Vector2(110, 44), () => { paused = !paused; pauseBtn.Text.text = paused ? "Пусни" : "Пауза"; pauseBtn.On = paused; }); x0 += 120;
+            foreach (var o in MiniJson.L(def["speeds"]))
+            {
+                var sp = MiniJson.O(o); float k = (float)MiniJson.D(sp, "k", 1); string lbl = MiniJson.S(sp, "label");
+                UIKit.Btn b = null;
+                b = UIKit.Button(bar, lbl, new Vector2(x0, 0), new Vector2(Mathf.Max(70, lbl.Length * 11 + 24), 44), () => { speedK = k; foreach (var s in speedBtns) s.On = s == b; }, 15);
+                b.On = Mathf.Approximately(k, speedK); speedBtns.Add(b);
+                x0 += Mathf.Max(70, lbl.Length * 11 + 24) + 6;
+            }
+            x0 += 14;
+            scenBtn = UIKit.Button(bar, "Сценарии", new Vector2(x0, 0), new Vector2(132, 44), () => ShowPanel(scenPanel.gameObject.activeSelf ? null : scenPanel)); x0 += 140;
+            parBtn = UIKit.Button(bar, "Параметри", new Vector2(x0, 0), new Vector2(132, 44), () => ShowPanel(parPanel.gameObject.activeSelf ? null : parPanel)); x0 += 140;
+            learnBtn = UIKit.Button(bar, "Учи", new Vector2(x0, 0), new Vector2(90, 44), () => ShowPanel(learnPanel.gameObject.activeSelf ? null : learnPanel)); x0 += 98;
+            UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(100, 44), () => orbit.ResetView()); x0 += 108;
+            if (heart != null)
+            {
+                UIKit.Btn ib = null;
+                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, 44), () => { heart.SetInternalView(!heart.InternalView); ib.On = heart.InternalView; });
+            }
+            else if (lungs != null)
+            {
+                UIKit.Btn ib = null;
+                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, 44), () => { lungs.SetInternalView(!lungs.InternalView); ib.On = lungs.InternalView; });
+            }
+
+            BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
+            if (heart == null && lungs == null)
+                UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
+            var credit = UIKit.Label(C, "Физиологичен модел: medAtlas (същият като в уеб версията). Само за обучение.", 11, new Color(1, 1, 1, 0.3f), null, TextAnchor.LowerLeft);
+            var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
+            ResponsiveLayout.Attach(C, orbit);
+            LayoutCard();
+        }
+
+        void BuildCharts()
+        {
+            var charts = MiniJson.L(def["charts"]); var xyDefs = MiniJson.L(def.ContainsKey("xy") ? def["xy"] : null);
+            int nStrip = Mathf.Min(charts.Count, 4);
+            bool hasXY = xyDefs.Count > 0;
+            float w = hasXY ? 720 : 660, h = 560;
+            var gp = UIKit.Rect("Graphs", C, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-36, 112), new Vector2(w, h));
+            UIKit.PanelImage(gp, UIKit.Panel);
+            float colW = hasXY ? 450 : 600;
+            float each = (h - 20) / Mathf.Max(1, nStrip);
+            for (int i = 0; i < nStrip; i++)
+            {
+                var cd = MiniJson.O(charts[i]);
+                float top = -12 - i * each;
+                UIKit.LabelAt(gp, MiniJson.S(cd, "title"), 14, UIKit.TextMain, new Vector2(18, top), new Vector2(colW, 20), UIKit.SemiBold);
+                var st = new Strip { window = (float)MiniJson.D(cd, "window", 10) };
+                var leg = UIKit.LabelAt(gp, "", 12, UIKit.TextDim, new Vector2(18, top - 19), new Vector2(colW + 20, 18)); leg.supportRichText = true; st.legend = leg;
+                var rt = UIKit.Rect("graph", gp, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(54, top - 40), new Vector2(colW - 40, each - 52));
+                var g = rt.gameObject.AddComponent<TraceGraph>(); g.raycastTarget = false;
+                g.Min = (float)MiniJson.D(cd, "min"); g.Max = (float)MiniJson.D(cd, "max");
+                var guides = new List<float>(); foreach (var gg in MiniJson.L(cd["guides"])) guides.Add((float)MiniJson.D(MiniJson.O(gg), "y"));
+                if (g.Min < 0 && g.Max > 0) guides.Add(0);
+                g.GridValues = guides.ToArray();
+                UIKit.LabelAt(gp, Fmt(g.Max, g.Max < 10 ? 1 : 0), 10, new Color(1, 1, 1, 0.4f), new Vector2(6, top - 40), new Vector2(44, 14), null, TextAnchor.UpperRight);
+                UIKit.LabelAt(gp, Fmt(g.Min, Mathf.Abs(g.Min) < 10 && g.Min != 0 ? 1 : 0), 10, new Color(1, 1, 1, 0.4f), new Vector2(6, top - 40 - (each - 52) + 12), new Vector2(44, 14), null, TextAnchor.UpperRight);
+                var lg = new System.Text.StringBuilder();
+                foreach (var co in MiniJson.L(cd["channels"]))
+                {
+                    var ch = MiniJson.O(co);
+                    var buf = new float[N]; for (int k = 0; k < N; k++) buf[k] = float.NaN;
+                    st.ch.Add(MiniJson.S(ch, "id")); st.buf.Add(buf);
+                    var col = Hex(MiniJson.S(ch, "color"), Color.white);
+                    g.Lines.Add(new TraceGraph.Series { Data = buf, Color = col, Width = 2f });
+                    string unit = MiniJson.S(ch, "unit");
+                    lg.Append("<color=#").Append(ColorUtility.ToHtmlStringRGB(col)).Append(">━ ").Append(MiniJson.S(ch, "label")).Append(unit != "" ? " (" + unit + ")" : "").Append("</color>   ");
+                }
+                leg.text = lg.ToString();
+                st.g = g; strips.Add(st);
+            }
+            if (hasXY)
+            {
+                var xd = MiniJson.O(xyDefs[0]);
+                UIKit.LabelAt(gp, MiniJson.S(xd, "title"), 13, UIKit.TextMain, new Vector2(470, -12), new Vector2(240, 36), UIKit.SemiBold);
+                var rt = UIKit.Rect("xy", gp, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(478, -56), new Vector2(226, 226));
+                var g = rt.gameObject.AddComponent<TraceGraph>(); g.raycastTarget = false;
+                var xr = MiniJson.L(xd["xr"]); var yr = MiniJson.L(xd["yr"]);
+                g.XMin = (float)MiniJson.Num(xr[0]); g.XMax = (float)MiniJson.Num(xr[1]); g.Min = (float)MiniJson.Num(yr[0]); g.Max = (float)MiniJson.Num(yr[1]);
+                UIKit.LabelAt(gp, MiniJson.S(xd, "xl") + " →   ↑ " + MiniJson.S(xd, "yl"), 11, UIKit.TextDim, new Vector2(478, -286), new Vector2(226, 16));
+                var xy = new XY { g = g, x = MiniJson.S(xd, "x"), y = MiniJson.S(xd, "y"), trail = (float)MiniJson.D(xd, "trail", 2), bx = new float[N], by = new float[N], hasCurve = xd.ContainsKey("hasCurve") && xd["hasCurve"] is bool hb && hb };
+                var normal = MiniJson.L(xd.ContainsKey("normal") ? xd["normal"] : null);
+                if (normal.Count > 1)
+                {
+                    var nx = new float[normal.Count]; var ny = new float[normal.Count];
+                    for (int i = 0; i < normal.Count; i++) { var pt = MiniJson.L(normal[i]); nx[i] = (float)MiniJson.Num(pt[0]); ny[i] = (float)MiniJson.Num(pt[1]); }
+                    g.Lines.Add(new TraceGraph.Series { Data = ny, X = nx, Color = new Color(1, 1, 1, 0.25f), Width = 1.5f });
+                }
+                if (xy.hasCurve) { xy.curve = new TraceGraph.Series { Data = new float[2], X = new float[2], Color = new Color(1, 1, 1, 0.5f), Width = 1.8f, Count = 0 }; g.Lines.Add(xy.curve); }
+                g.Lines.Add(new TraceGraph.Series { Data = xy.by, X = xy.bx, Color = Hex(MiniJson.S(xd, "color"), Color.yellow), Width = 2.4f, Count = 0 });
+                g.MarkerColor = Hex(MiniJson.S(xd, "color"), Color.yellow);
+                xys.Add(xy);
+                if (xyDefs.Count > 1)
+                {
+                    var x2 = MiniJson.O(xyDefs[1]);
+                    UIKit.LabelAt(gp, "Още: " + MiniJson.S(x2, "title"), 11, UIKit.TextDim, new Vector2(478, -310), new Vector2(226, 40));
+                }
+            }
+        }
+
+        void ShowPanel(RectTransform which)
+        {
+            scenPanel.gameObject.SetActive(which == scenPanel); parPanel.gameObject.SetActive(which == parPanel); learnPanel.gameObject.SetActive(which == learnPanel);
+            card.gameObject.SetActive(which == null);
+            scenBtn.On = which == scenPanel; parBtn.On = which == parPanel; learnBtn.On = which == learnPanel;
+        }
+
+        RectTransform Panel(string name, string title)
+        {
+            var p = UIKit.Rect(name, C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -128), new Vector2(470, 600));
+            UIKit.PanelImage(p, UIKit.Panel);
+            UIKit.LabelAt(p, title, 22, UIKit.TextMain, new Vector2(22, -16), new Vector2(420, 30), UIKit.SemiBold);
+            return p;
+        }
+
+        void BuildScenarioPanel()
+        {
+            scenPanel = Panel("Scenarios", "Сценарии");
+            var presets = MiniJson.L(def["presets"]);
+            float y = -56;
+            foreach (var o in presets)
+            {
+                var p = MiniJson.O(o); string id = MiniJson.S(p, "id");
+                var b = UIKit.Button(scenPanel, MiniJson.S(p, "label"), Vector2.zero, new Vector2(424, 32), () => ApplyPreset(id), 14);
+                var rt = b.Button.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1); rt.anchoredPosition = new Vector2(22, y);
+                b.Text.alignment = TextAnchor.MiddleLeft; b.Text.rectTransform.offsetMin = new Vector2(12, 0);
+                sync.Add(() => b.On = presetId == id);
+                y -= 36;
+            }
+            scenPanel.sizeDelta = new Vector2(470, -y + 16);
+            scenPanel.gameObject.SetActive(false);
+        }
+
+        void BuildParamPanel()
+        {
+            parPanel = Panel("Params", "Параметри");
+            float y = -56;
+            var acts = MiniJson.L(def["actions"]);
+            if (acts.Count > 0)
+            {
+                UIKit.LabelAt(parPanel, "ДЕЙСТВИЯ", 12, new Color(1, 1, 1, 0.4f), new Vector2(22, y), new Vector2(300, 16), UIKit.SemiBold); y -= 20;
+                float x = 22;
+                foreach (var o in acts)
+                {
+                    var a = MiniJson.O(o); string id = MiniJson.S(a, "id"); string lbl = MiniJson.S(a, "label");
+                    float bw = Mathf.Min(424, lbl.Length * 9 + 30);
+                    if (x + bw > 446) { x = 22; y -= 38; }
+                    var b = UIKit.Button(parPanel, lbl, Vector2.zero, new Vector2(bw, 32), () => PhysioBridge.Act(handle, id), 13);
+                    var rt = b.Button.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1); rt.anchoredPosition = new Vector2(x, y);
+                    x += bw + 6;
+                }
+                y -= 46;
+            }
+            foreach (var o in MiniJson.L(def["sliders"]))
+            {
+                var s = MiniJson.O(o); string id = MiniJson.S(s, "id"); string unit = MiniJson.S(s, "unit");
+                float min = (float)MiniJson.D(s, "min"), max = (float)MiniJson.D(s, "max"), step = (float)MiniJson.D(s, "step", 0.01);
+                int dp = (int)MiniJson.D(s, "dp", -1); if (dp < 0) dp = step >= 1 ? 0 : step >= 0.1f ? 1 : step >= 0.01f ? 2 : 3;
+                UIKit.LabelAt(parPanel, MiniJson.S(s, "label"), 13, UIKit.TextDim, new Vector2(22, y), new Vector2(310, 18));
+                var val = UIKit.LabelAt(parPanel, "", 13, UIKit.TextMain, new Vector2(300, y), new Vector2(148, 18), UIKit.SemiBold, TextAnchor.UpperRight);
+                float Get() => values.TryGetValue(id, out var v) ? (float)MiniJson.Num(v, 0) : min;
+                var sl = UIKit.Slider(parPanel, Vector2.zero, new Vector2(420, 20), min, max, Get(), v =>
+                {
+                    v = Mathf.Round(v / step) * step; values[id] = (double)v; PhysioBridge.Set(handle, MiniJson.Write(values));
+                }, false);
+                var srt = sl.GetComponent<RectTransform>(); srt.anchorMin = srt.anchorMax = new Vector2(0, 1); srt.pivot = new Vector2(0, 1); srt.anchoredPosition = new Vector2(26, y - 19);
+                string F() => Fmt(Get(), dp) + (unit != "" ? " " + unit : "");
+                sl.onValueChanged.AddListener(_ => val.text = F()); val.text = F();
+                sync.Add(() => { sl.SetValueWithoutNotify(Get()); val.text = F(); });
+                y -= 44;
+            }
+            float tx = 22;
+            foreach (var o in MiniJson.L(def["toggles"]))
+            {
+                var tg = MiniJson.O(o); string id = MiniJson.S(tg, "id"); string lbl = MiniJson.S(tg, "label");
+                float bw = Mathf.Min(424, lbl.Length * 8.5f + 30);
+                if (tx + bw > 446) { tx = 22; y -= 38; }
+                bool Get() => values.TryGetValue(id, out var v) && v is bool b0 && b0;
+                UIKit.Btn b = null;
+                b = UIKit.Button(parPanel, lbl, Vector2.zero, new Vector2(bw, 32), () => { values[id] = !Get(); b.On = Get(); PhysioBridge.Set(handle, MiniJson.Write(values)); }, 13);
+                var rt = b.Button.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1); rt.anchoredPosition = new Vector2(tx, y);
+                b.On = Get(); sync.Add(() => b.On = Get());
+                tx += bw + 6;
+            }
+            if (tx > 22) y -= 40;
+            parPanel.sizeDelta = new Vector2(470, -y + 16);
+            parPanel.gameObject.SetActive(false);
+        }
+
+        void BuildLearnPanel()
+        {
+            learnPanel = Panel("Learn", "Ключови идеи");
+            var sb = new System.Text.StringBuilder();
+            foreach (var o in MiniJson.L(def["learn"])) sb.Append("• ").Append(o as string).Append("\n\n");
+            var t = UIKit.LabelAt(learnPanel, sb.ToString().TrimEnd(), 14, new Color(0.86f, 0.87f, 0.9f), new Vector2(22, -56), new Vector2(426, 100));
+            float h = t.preferredHeight; t.rectTransform.sizeDelta = new Vector2(426, h);
+            learnPanel.sizeDelta = new Vector2(470, h + 76);
+            learnPanel.gameObject.SetActive(false);
+        }
+
+        void ApplyPreset(string id)
+        {
+            var p = MiniJson.O(MiniJson.L(def["presets"]).Find(o => MiniJson.S(MiniJson.O(o), "id") == id));
+            values = new D(MiniJson.O(def["defaults"]));
+            foreach (var kv in MiniJson.O(p["values"])) values[kv.Key] = kv.Value;
+            PhysioBridge.Set(handle, MiniJson.Write(values));
+            presetId = id;
+            foreach (var a in sync) a();
+            LayoutCard();
+            ShowPanel(null);
+        }
+
+        string lastPhaseTitle;
+
+        void LayoutCard()
+        {
+            float y = -18;
+            var presets = MiniJson.L(def["presets"]);
+            var p = MiniJson.O(presets.Find(o => MiniJson.S(MiniJson.O(o), "id") == presetId));
+            bool has = p != null;
+            scenTitle.gameObject.SetActive(has); scenText.gameObject.SetActive(has);
+            if (has)
+            {
+                scenTitle.text = "СЪСТОЯНИЕ: " + MiniJson.S(p, "label").ToUpperInvariant(); scenText.text = MiniJson.S(p, "text");
+                scenTitle.rectTransform.anchoredPosition = new Vector2(24, y); y -= 22;
+                scenText.rectTransform.anchoredPosition = new Vector2(24, y);
+                float hh = scenText.preferredHeight; scenText.rectTransform.sizeDelta = new Vector2(404, hh); y -= hh + 14;
+            }
+            ((RectTransform)phaseDot.transform).anchoredPosition = new Vector2(24, y - 9);
+            phaseTitle.rectTransform.anchoredPosition = new Vector2(44, y);
+            float th = Mathf.Max(28, phaseTitle.preferredHeight); phaseTitle.rectTransform.sizeDelta = new Vector2(384, th); y -= th + 6;
+            phaseText.rectTransform.anchoredPosition = new Vector2(24, y);
+            float ph = phaseText.preferredHeight; phaseText.rectTransform.sizeDelta = new Vector2(404, ph); y -= ph + 16;
+            card.sizeDelta = new Vector2(450, -y + 6);
+        }
+
+        // ---------------------------------------------------------------- loop
+        void Update()
+        {
+            if (!ready) return;
+            float dt = Mathf.Min(Time.deltaTime, 0.05f);
+            float modelDt = paused ? 0 : dt * speedK;
+            int maxSamples = 200;
+            var res = MiniJson.O(MiniJson.Parse(PhysioBridge.Step(handle, modelDt, maxSamples)));
+            if (res == null) return;
+            var samples = MiniJson.L(res["samples"]);
+            int taken = samples.Count;
+            float perSample = taken > 0 ? modelDt / taken : 0;
+            foreach (var so in samples)
+            {
+                var smp = MiniJson.O(so);
+                foreach (var st in strips)
+                {
+                    st.acc += perSample;
+                    float every = st.window / N;
+                    while (st.acc >= every)
+                    {
+                        st.acc -= every;
+                        for (int c = 0; c < st.ch.Count; c++)
+                        {
+                            var buf = st.buf[c];
+                            System.Array.Copy(buf, 1, buf, 0, N - 1);
+                            buf[N - 1] = smp.TryGetValue(st.ch[c], out var v) ? (float)MiniJson.Num(v) : float.NaN;
+                        }
+                    }
+                }
+                foreach (var xy in xys)
+                {
+                    float xv = smp.TryGetValue(xy.x, out var a) ? (float)MiniJson.Num(a) : float.NaN;
+                    float yv = smp.TryGetValue(xy.y, out var b) ? (float)MiniJson.Num(b) : float.NaN;
+                    int keep = Mathf.Clamp(Mathf.RoundToInt(xy.trail / Mathf.Max(sampleDt * (perSample > 0 ? perSample / sampleDt : 1), 1e-4f)), 2, N);
+                    if (xy.n < keep) xy.n++;
+                    if (xy.n > keep) xy.n = keep;
+                    System.Array.Copy(xy.bx, 1, xy.bx, 0, N - 1); System.Array.Copy(xy.by, 1, xy.by, 0, N - 1);
+                    xy.bx[N - 1] = xv; xy.by[N - 1] = yv;
+                }
+            }
+            foreach (var xy in xys)
+            {
+                var s = xy.g.Lines[xy.g.Lines.Count - 1];
+                // the series draws from index 0: point it at the newest n samples
+                int n = xy.n; if (s.Data.Length != n) { s.Data = new float[n]; s.X = new float[n]; }
+                System.Array.Copy(xy.by, N - n, s.Data, 0, n); System.Array.Copy(xy.bx, N - n, s.X, 0, n);
+                s.Count = n;
+                if (n > 0) { xy.g.MarkerX = Mathf.InverseLerp(xy.g.XMin, xy.g.XMax, s.X[n - 1]); xy.g.MarkerY = Mathf.InverseLerp(xy.g.Min, xy.g.Max, s.Data[n - 1]); }
+            }
+            curveTimer -= dt;
+            if (curveTimer <= 0)
+            {
+                curveTimer = 0.5f;
+                foreach (var xy in xys)
+                {
+                    if (!xy.hasCurve) continue;
+                    var pts = MiniJson.L(MiniJson.Parse(PhysioBridge.Curve(handle, 0)));
+                    var cx = new float[pts.Count]; var cy = new float[pts.Count];
+                    for (int i = 0; i < pts.Count; i++) { var pt = MiniJson.L(pts[i]); cx[i] = (float)MiniJson.Num(pt[0]); cy[i] = (float)MiniJson.Num(pt[1]); }
+                    xy.curve.X = cx; xy.curve.Data = cy; xy.curve.Count = pts.Count;
+                }
+            }
+            foreach (var st in strips) st.g.Refresh();
+            foreach (var xy in xys) xy.g.Refresh();
+
+            // phase
+            var ph = MiniJson.O(res["phase"]);
+            string ptitle = MiniJson.S(ph, "title");
+            phaseTitle.text = ptitle; phaseText.text = MiniJson.S(ph, "text");
+            phaseDot.color = Hex(MiniJson.S(ph, "color"), UIKit.Accent);
+            if (ptitle != lastPhaseTitle) { lastPhaseTitle = ptitle; LayoutCard(); }
+
+            // stats
+            var stv = MiniJson.O(res["stats"]);
+            var sb = new System.Text.StringBuilder();
+            foreach (var o in MiniJson.L(def["stats"]))
+            {
+                var s = MiniJson.O(o); string id = MiniJson.S(s, "id"); int dp = (int)MiniJson.D(s, "dp", 0); string unit = MiniJson.S(s, "unit");
+                object v = stv != null && stv.TryGetValue(id, out var vv) ? vv : null;
+                string txt; bool bad = false;
+                if (v is double d)
+                {
+                    txt = Fmt(d, dp);
+                    var nr = MiniJson.L(s.ContainsKey("normal") ? s["normal"] : null);
+                    if (nr.Count == 2 && (d < MiniJson.Num(nr[0]) || d > MiniJson.Num(nr[1]))) bad = true;
+                }
+                else txt = v == null ? "—" : v.ToString();
+                if (unit != "" && v is double) txt += " " + unit;
+                sb.Append(bad ? "<color=#FFB347>" + txt + "</color>" : txt).Append('\n');
+            }
+            statsValues.text = sb.ToString();
+
+            Drive3D(MiniJson.O(res["now"]), stv, dt);
+        }
+
+        static float Pick(Dictionary<string, object> a, Dictionary<string, object> b, float def, params string[] keys)
+        {
+            foreach (var k in keys)
+            {
+                if (a != null && a.TryGetValue(k, out var v) && v is double d) return (float)d;
+                if (b != null && b.TryGetValue(k, out var w) && w is double e) return (float)e;
+            }
+            return def;
+        }
+
+        void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
+        {
+            float phys = paused ? 0 : dt;
+            if (heart != null && heart.Parts.Count > 0)
+            {
+                float hr = Pick(now, stats, 72f, "hr", "rate");
+                heartSim.HeartRate = Mathf.Clamp(hr, 25f, 220f);
+                if (phys > 0) heartSim.Advance(phys);
+                heart.Apply(heartSim);
+            }
+            if (lungs != null && lungs.Parts.Count > 0)
+            {
+                float rr = Pick(now, stats, 12f, "rr", "rate");
+                lungSim.P.rr = Mathf.Clamp(rr, 2f, 40f);
+                if (phys > 0) lungSim.Advance(phys);
+                float vol = Pick(now, null, float.NaN, "vol", "v");
+                float sat = Pick(now, stats, 97f, "spo2", "sao2"); if (sat > 1.5f) sat /= 100f;
+                lungs.Apply(float.IsNaN(vol) ? lungSim.V : vol, 0, sat);
+            }
+        }
+    }
+}

@@ -7,7 +7,9 @@ namespace MedAtlas.Heart
     /// <summary>Lightweight line chart drawn as a UI mesh (several series, grid, phase bands, sweep cursor).</summary>
     public class TraceGraph : MaskableGraphic
     {
-        public class Series { public float[] Data; public Color Color; public float Width = 2f; public bool Dashed; }
+        public class Series { public float[] Data; public float[] X; public int Count = -1; public Color Color; public float Width = 2f; public bool Dashed; }
+        public float XMin = 0, XMax = 1;
+        float XP(Rect plot, float v) => plot.xMin + plot.width * Mathf.Clamp01((v - XMin) / (XMax - XMin));
         public readonly List<Series> Lines = new List<Series>();
         public float Min = 0, Max = 1;
         public float[] GridValues;
@@ -65,7 +67,16 @@ namespace MedAtlas.Heart
             foreach (var s in Lines)
             {
                 if (s.Data == null || s.Data.Length < 2) continue;
-                int n = s.Data.Length;
+                int n = s.Count >= 0 ? s.Count : s.Data.Length;
+                if (s.X != null)
+                {
+                    for (int i = 0; i < n - 1; i++)
+                    {
+                        if (float.IsNaN(s.Data[i]) || float.IsNaN(s.Data[i + 1])) continue;
+                        Line(vh, new Vector2(XP(plot, s.X[i]), Y(plot, s.Data[i])), new Vector2(XP(plot, s.X[i + 1]), Y(plot, s.Data[i + 1])), s.Width, s.Color);
+                    }
+                    continue;
+                }
                 for (int i = 0; i < n - 1; i++)
                 {
                     if (s.Dashed && (i / 6) % 2 == 1) continue;
@@ -76,6 +87,7 @@ namespace MedAtlas.Heart
                         if (i < ci && i + 1 >= ci) continue;
                         if (i > ci && i < ci + 6) continue;
                     }
+                    if (float.IsNaN(s.Data[i]) || float.IsNaN(s.Data[i + 1])) continue;
                     Vector2 a = new Vector2(plot.xMin + plot.width * i / (n - 1), Y(plot, s.Data[i]));
                     Vector2 b = new Vector2(plot.xMin + plot.width * (i + 1) / (n - 1), Y(plot, s.Data[i + 1]));
                     Line(vh, a, b, s.Width, s.Color);
