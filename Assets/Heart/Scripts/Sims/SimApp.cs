@@ -35,6 +35,7 @@ namespace MedAtlas.Sims
         readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
         const int N = 400;
         float sampleDt = 0.004f; float curveTimer;
+        float statsH; float GraphW => MiniJson.L(def.ContainsKey("xy") ? def["xy"] : null).Count > 0 ? 720 : 620;
         bool ready;
 
         void Start()
@@ -182,72 +183,87 @@ namespace MedAtlas.Sims
         {
             BuildCanvas();
             string title = MiniJson.S(def, "title");
-            UIKit.LabelAt(C, "Физиология", 38, UIKit.TextMain, new Vector2(44, -30), new Vector2(320, 50), UIKit.SemiBold);
-            SceneTabs.Add(C, "Sim");
-            var t = UIKit.LabelAt(C, title, 19, UIKit.TextDim, new Vector2(46, -80), new Vector2(1100, 26), UIKit.Italic);
-            var hint = UIKit.LabelAt(C, "Плъзни – въртене · колелце / два пръста – мащаб · десен бутон – преместване", 13, new Color(1, 1, 1, 0.38f), new Vector2(46, -104), new Vector2(900, 20));
+            // header: back to the catalog, the organ-system chip and the title (like the web app)
+            var back = UIKit.Button(C, "←  Всички модели", Vector2.zero, new Vector2(214, 44), () => UnityEngine.SceneManagement.SceneManager.LoadScene("Menu"), 16);
+            var brt = back.Button.GetComponent<RectTransform>(); brt.anchorMin = brt.anchorMax = new Vector2(0, 1); brt.pivot = new Vector2(0, 1); brt.anchoredPosition = new Vector2(36, -26);
+            brt.gameObject.name = "Back";
+            var ai = MenuApp.AreaInfo(MiniJson.S(def, "area"));
+            float chipW = ai.bg.Length * 9f + 36;
+            var chip = UIKit.Rect("AreaChip", C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(262, -32), new Vector2(chipW, 32));
+            UIKit.PanelImage(chip, new Color(ai.color.r * 0.2f, ai.color.g * 0.2f, ai.color.b * 0.2f, 0.95f));
+            var ct = UIKit.Label(chip, ai.bg.ToUpperInvariant(), 13, ai.color, UIKit.SemiBold, TextAnchor.MiddleCenter);
+            ct.rectTransform.anchorMin = Vector2.zero; ct.rectTransform.anchorMax = Vector2.one; ct.rectTransform.offsetMin = ct.rectTransform.offsetMax = Vector2.zero;
+            var t = UIKit.LabelAt(C, title, 30, UIKit.TextMain, new Vector2(38, -82), new Vector2(1100, 40), UIKit.SemiBold);
+            t.gameObject.name = "Title";
+            var hint = UIKit.LabelAt(C, "Плъзни – въртене · колелце / два пръста – мащаб · десен бутон – преместване", 13, new Color(UIKit.TextDim.r, UIKit.TextDim.g, UIKit.TextDim.b, 0.7f), new Vector2(40, -124), new Vector2(900, 20));
 
             // phase card
-            card = UIKit.Rect("PhaseCard", C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -128), new Vector2(450, 300));
+            card = UIKit.Rect("PhaseCard", C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -160), new Vector2(450, 300));
             UIKit.PanelImage(card, UIKit.Panel);
-            scenTitle = UIKit.LabelAt(card, "", 14, new Color(0.55f, 0.85f, 1f), Vector2.zero, new Vector2(404, 22), UIKit.SemiBold);
-            scenText = UIKit.LabelAt(card, "", 14, new Color(0.75f, 0.85f, 0.95f), Vector2.zero, new Vector2(404, 60), UIKit.Italic);
+            scenTitle = UIKit.LabelAt(card, "", 13, UIKit.Accent, Vector2.zero, new Vector2(404, 22), UIKit.SemiBold);
+            scenText = UIKit.LabelAt(card, "", 14, UIKit.TextDim, Vector2.zero, new Vector2(404, 60));
             phaseDot = UIKit.Dot(card, Vector2.zero, 12, Color.white);
             phaseTitle = UIKit.LabelAt(card, "", 22, UIKit.TextMain, Vector2.zero, new Vector2(380, 30), UIKit.SemiBold);
             phaseText = UIKit.LabelAt(card, "", 15, new Color(0.84f, 0.85f, 0.88f), Vector2.zero, new Vector2(404, 100));
 
             // stats
             var statsDef = MiniJson.L(def["stats"]);
-            var stats = UIKit.Rect("Stats", C, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-36, -30), new Vector2(380, 30 + statsDef.Count * 19));
+            bool dense = statsDef.Count > 12; float rowH = dense ? 16.5f : 22f; int fs = dense ? 12 : 14;
+            statsH = 64 + statsDef.Count * rowH;
+            var stats = UIKit.Rect("Stats", C, new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-36, -26), new Vector2(GraphW, statsH));
             UIKit.PanelImage(stats, UIKit.Panel);
+            UIKit.LabelAt(stats, "Стойности", 17, UIKit.TextMain, new Vector2(22, -16), new Vector2(300, 24), UIKit.SemiBold);
             var sb = new System.Text.StringBuilder();
             foreach (var o in statsDef) sb.Append(MiniJson.S(MiniJson.O(o), "label")).Append('\n');
-            statsLabels = UIKit.LabelAt(stats, sb.ToString(), 13, UIKit.TextDim, new Vector2(18, -14), new Vector2(240, statsDef.Count * 19 + 10));
-            statsLabels.lineSpacing = 1.12f;
-            statsValues = UIKit.LabelAt(stats, "", 13, UIKit.TextMain, new Vector2(200, -14), new Vector2(162, statsDef.Count * 19 + 10), UIKit.SemiBold, TextAnchor.UpperRight);
-            statsValues.lineSpacing = 1.12f; statsValues.supportRichText = true;
+            statsLabels = UIKit.LabelAt(stats, sb.ToString(), fs, UIKit.TextDim, new Vector2(24, -52), new Vector2(GraphW * 0.62f, statsDef.Count * rowH + 10));
+            statsLabels.lineSpacing = dense ? 1.12f : 1.26f;
+            statsValues = UIKit.LabelAt(stats, "", fs, UIKit.TextMain, new Vector2(GraphW * 0.45f, -52), new Vector2(GraphW * 0.55f - 26, statsDef.Count * rowH + 10), UIKit.SemiBold, TextAnchor.UpperRight);
+            statsValues.lineSpacing = statsLabels.lineSpacing; statsValues.supportRichText = true;
 
             // charts
             BuildCharts();
 
             // controls
-            var bar = UIKit.Rect("Controls", C, Vector2.zero, Vector2.zero, Vector2.zero, new Vector2(36, 30), new Vector2(1848, 64));
+            // control bar: centred, in groups (play + speed | panels | view), like the web toolbar
+            var bar = UIKit.Rect("Controls", C, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 26), new Vector2(1200, 64));
             UIKit.PanelImage(bar, UIKit.Panel);
-            float x0 = 14;
-            pauseBtn = UIKit.Button(bar, "Пауза", new Vector2(x0, 0), new Vector2(110, 44), () => { paused = !paused; pauseBtn.Text.text = paused ? "Пусни" : "Пауза"; pauseBtn.On = paused; }); x0 += 120;
+            float x0 = 10;
+            const float H = 44, G = 6, GG = 22;
+            pauseBtn = UIKit.Button(bar, "Пауза", new Vector2(x0, 0), new Vector2(110, H), () => { paused = !paused; pauseBtn.Text.text = paused ? "Пусни" : "Пауза"; pauseBtn.On = paused; }); x0 += 110 + G + 4;
             foreach (var o in MiniJson.L(def["speeds"]))
             {
                 var sp = MiniJson.O(o); float k = (float)MiniJson.D(sp, "k", 1); string lbl = MiniJson.S(sp, "label");
-                UIKit.Btn b = null;
-                b = UIKit.Button(bar, lbl, new Vector2(x0, 0), new Vector2(Mathf.Max(70, lbl.Length * 11 + 24), 44), () => { speedK = k; foreach (var s in speedBtns) s.On = s == b; }, 15);
+                UIKit.Btn b = null; float bw = Mathf.Max(66, lbl.Length * 11 + 24);
+                b = UIKit.Button(bar, lbl, new Vector2(x0, 0), new Vector2(bw, H), () => { speedK = k; foreach (var s2 in speedBtns) s2.On = s2 == b; }, 15);
                 b.On = Mathf.Approximately(k, speedK); speedBtns.Add(b);
-                x0 += Mathf.Max(70, lbl.Length * 11 + 24) + 6;
+                x0 += bw + G;
             }
-            x0 += 14;
-            scenBtn = UIKit.Button(bar, "Сценарии", new Vector2(x0, 0), new Vector2(132, 44), () => ShowPanel(scenPanel.gameObject.activeSelf ? null : scenPanel)); x0 += 140;
-            parBtn = UIKit.Button(bar, "Параметри", new Vector2(x0, 0), new Vector2(132, 44), () => ShowPanel(parPanel.gameObject.activeSelf ? null : parPanel)); x0 += 140;
-            learnBtn = UIKit.Button(bar, "Учи", new Vector2(x0, 0), new Vector2(90, 44), () => ShowPanel(learnPanel.gameObject.activeSelf ? null : learnPanel)); x0 += 98;
-            UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(100, 44), () => orbit.ResetView()); x0 += 108;
+            x0 += GG;
+            scenBtn = UIKit.Button(bar, "Сценарии", new Vector2(x0, 0), new Vector2(136, H), () => ShowPanel(scenPanel.gameObject.activeSelf ? null : scenPanel)); x0 += 136 + G;
+            parBtn = UIKit.Button(bar, "Параметри", new Vector2(x0, 0), new Vector2(140, H), () => ShowPanel(parPanel.gameObject.activeSelf ? null : parPanel)); x0 += 140 + G;
+            learnBtn = UIKit.Button(bar, "Учи", new Vector2(x0, 0), new Vector2(92, H), () => ShowPanel(learnPanel.gameObject.activeSelf ? null : learnPanel)); x0 += 92 + G + GG;
+            UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(110, H), () => orbit.ResetView()); x0 += 110 + G;
             UIKit.Btn fb = null;
-            fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(116, 44), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 124;
+            fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
             if (heart != null)
             {
                 UIKit.Btn ib = null;
-                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, 44), () => { heart.SetInternalView(!heart.InternalView); ib.On = heart.InternalView; });
+                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, H), () => { heart.SetInternalView(!heart.InternalView); ib.On = heart.InternalView; }); x0 += 190 + G;
             }
             else if (lungs != null)
             {
                 UIKit.Btn ib = null;
-                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, 44), () => { lungs.SetInternalView(!lungs.InternalView); ib.On = lungs.InternalView; });
+                ib = UIKit.Button(bar, "Вътрешен изглед", new Vector2(x0, 0), new Vector2(190, H), () => { lungs.SetInternalView(!lungs.InternalView); ib.On = lungs.InternalView; }); x0 += 190 + G;
             }
+            bar.sizeDelta = new Vector2(x0 + 4, 64);
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
             if (heart == null && lungs == null && organ == null && micro == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
-            var credit = UIKit.Label(C, "Физиологичен модел: medAtlas (същият като в уеб версията). Само за обучение.", 11, new Color(1, 1, 1, 0.3f), null, TextAnchor.LowerLeft);
-            var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(900, 20);
+            var credit = UIKit.Label(C, "Физиологичен модел: Med Simulation 3D. Само за обучение.", 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
+            var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(900, 18);
             layout = ResponsiveLayout.Attach(C, orbit);
-            layout.LandscapeOffsetX = 0.07f;
+            layout.LandscapeOffsetX = 0.03f;
             LayoutCard();
         }
 
@@ -256,10 +272,10 @@ namespace MedAtlas.Sims
             var charts = MiniJson.L(def["charts"]); var xyDefs = MiniJson.L(def.ContainsKey("xy") ? def["xy"] : null);
             int nStrip = Mathf.Min(charts.Count, 4);
             bool hasXY = xyDefs.Count > 0;
-            float w = hasXY ? 720 : 660, h = 560;
-            var gp = UIKit.Rect("Graphs", C, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-36, 112), new Vector2(w, h));
+            float w = GraphW, h = Mathf.Clamp(1080 - 26 - statsH - 16 - 108, 360, 780);
+            var gp = UIKit.Rect("Graphs", C, new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-36, 108), new Vector2(w, h));
             UIKit.PanelImage(gp, UIKit.Panel);
-            float colW = hasXY ? 450 : 600;
+            float colW = hasXY ? w - 270 : w - 40;
             float each = (h - 20) / Mathf.Max(1, nStrip);
             for (int i = 0; i < nStrip; i++)
             {
@@ -293,12 +309,13 @@ namespace MedAtlas.Sims
             if (hasXY)
             {
                 var xd = MiniJson.O(xyDefs[0]);
-                UIKit.LabelAt(gp, MiniJson.S(xd, "title"), 13, UIKit.TextMain, new Vector2(470, -12), new Vector2(240, 36), UIKit.SemiBold);
-                var rt = UIKit.Rect("xy", gp, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(478, -56), new Vector2(226, 226));
+                float xx = w - 246;
+                UIKit.LabelAt(gp, MiniJson.S(xd, "title"), 13, UIKit.TextMain, new Vector2(xx - 8, -12), new Vector2(240, 36), UIKit.SemiBold);
+                var rt = UIKit.Rect("xy", gp, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(xx, -56), new Vector2(226, 226));
                 var g = rt.gameObject.AddComponent<TraceGraph>(); g.raycastTarget = false;
                 var xr = MiniJson.L(xd["xr"]); var yr = MiniJson.L(xd["yr"]);
                 g.XMin = (float)MiniJson.Num(xr[0]); g.XMax = (float)MiniJson.Num(xr[1]); g.Min = (float)MiniJson.Num(yr[0]); g.Max = (float)MiniJson.Num(yr[1]);
-                UIKit.LabelAt(gp, MiniJson.S(xd, "xl") + " →   ↑ " + MiniJson.S(xd, "yl"), 11, UIKit.TextDim, new Vector2(478, -286), new Vector2(226, 16));
+                UIKit.LabelAt(gp, MiniJson.S(xd, "xl") + " →   ↑ " + MiniJson.S(xd, "yl"), 11, UIKit.TextDim, new Vector2(xx, -286), new Vector2(226, 16));
                 var xy = new XY { g = g, x = MiniJson.S(xd, "x"), y = MiniJson.S(xd, "y"), trail = (float)MiniJson.D(xd, "trail", 2), bx = new float[N], by = new float[N], hasCurve = xd.ContainsKey("hasCurve") && xd["hasCurve"] is bool hb && hb };
                 var normal = MiniJson.L(xd.ContainsKey("normal") ? xd["normal"] : null);
                 if (normal.Count > 1)
@@ -314,7 +331,7 @@ namespace MedAtlas.Sims
                 if (xyDefs.Count > 1)
                 {
                     var x2 = MiniJson.O(xyDefs[1]);
-                    UIKit.LabelAt(gp, "Още: " + MiniJson.S(x2, "title"), 11, UIKit.TextDim, new Vector2(478, -310), new Vector2(226, 40));
+                    UIKit.LabelAt(gp, "Още: " + MiniJson.S(x2, "title"), 11, UIKit.TextDim, new Vector2(xx, -310), new Vector2(226, 40));
                 }
             }
         }
@@ -325,7 +342,7 @@ namespace MedAtlas.Sims
             {
                 var t = C.Find(n); if (t != null) t.gameObject.SetActive(!focus);
             }
-            orbit.ViewOffsetX = focus ? 0f : 0.07f;
+            orbit.ViewOffsetX = focus ? 0f : 0.03f;
             orbit.DistanceScale = focus ? 0.8f : 1f;
         }
 
@@ -338,7 +355,7 @@ namespace MedAtlas.Sims
 
         RectTransform Panel(string name, string title)
         {
-            var p = UIKit.Rect(name, C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -128), new Vector2(470, 600));
+            var p = UIKit.Rect(name, C, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(36, -160), new Vector2(470, 600));
             UIKit.PanelImage(p, UIKit.Panel);
             UIKit.LabelAt(p, title, 22, UIKit.TextMain, new Vector2(22, -16), new Vector2(420, 30), UIKit.SemiBold);
             return p;
@@ -352,11 +369,11 @@ namespace MedAtlas.Sims
             foreach (var o in presets)
             {
                 var p = MiniJson.O(o); string id = MiniJson.S(p, "id");
-                var b = UIKit.Button(scenPanel, MiniJson.S(p, "label"), Vector2.zero, new Vector2(424, 32), () => ApplyPreset(id), 14);
+                var b = UIKit.Button(scenPanel, MiniJson.S(p, "label"), Vector2.zero, new Vector2(424, 40), () => ApplyPreset(id), 15);
                 var rt = b.Button.GetComponent<RectTransform>(); rt.anchorMin = rt.anchorMax = new Vector2(0, 1); rt.pivot = new Vector2(0, 1); rt.anchoredPosition = new Vector2(22, y);
                 b.Text.alignment = TextAnchor.MiddleLeft; b.Text.rectTransform.offsetMin = new Vector2(12, 0);
                 sync.Add(() => b.On = presetId == id);
-                y -= 36;
+                y -= 46;
             }
             scenPanel.sizeDelta = new Vector2(470, -y + 16);
             scenPanel.gameObject.SetActive(false);

@@ -478,20 +478,28 @@ namespace MedAtlas.Heart
             }
         }
 
+        /// <summary>Backdrop like the web app: a deep navy night with a violet glow top-right, blue top-left and a hint of pink below.</summary>
         public static Texture2D RadialTexture()
         {
-            int w = 256, h = 144;
+            int w = 320, h = 180;
             var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            var bg = new Color(8 / 255f, 12 / 255f, 23 / 255f);
+            Color Glow(float x, float y, float cx, float cy, float rx, float ry, Color c, float a)
+            {
+                float dx = (x - cx) / rx, dy = (y - cy) / ry; float k = Mathf.Clamp01(1 - Mathf.Sqrt(dx * dx + dy * dy)); return c * (k * k * a);
+            }
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
-                    float dx = (x - w * 0.45f) / w, dy = (y - h * 0.55f) / h * 0.8f;
-                    float d = Mathf.Sqrt(dx * dx + dy * dy) * 1.6f;
-                    float k = Mathf.Clamp01(1 - d); k = k * k;
-                    var c = Color.Lerp(new Color(0.018f, 0.019f, 0.025f), new Color(0.115f, 0.11f, 0.13f), k);
-                    t.SetPixel(x, y, c);
+                    float u = x / (float)w, v = 1 - y / (float)h;   // v = 0 at the top
+                    var c = bg;
+                    c += Glow(u, v, 0.82f, -0.12f, 0.75f, 0.85f, new Color(155 / 255f, 123 / 255f, 1f), 0.20f);
+                    c += Glow(u, v, -0.08f, 0.04f, 0.6f, 0.75f, new Color(78 / 255f, 161 / 255f, 1f), 0.16f);
+                    c += Glow(u, v, 0.5f, 1.1f, 0.45f, 0.6f, new Color(1f, 93 / 255f, 143 / 255f), 0.09f);
+                    c += Glow(u, v, 0.5f, 0.55f, 0.45f, 0.5f, new Color(0.35f, 0.42f, 0.6f), 0.10f);   // soft light behind the organ
+                    c.a = 1; t.SetPixel(x, y, c);
                 }
-            t.Apply(); t.wrapMode = TextureWrapMode.Clamp;
+            t.Apply(); t.wrapMode = TextureWrapMode.Clamp; t.filterMode = FilterMode.Bilinear;
             return t;
         }
 

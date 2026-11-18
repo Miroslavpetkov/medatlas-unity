@@ -1,13 +1,13 @@
-<!doctype html><html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>MedAtlas Сърце и бели дробове</title>
+<!doctype html><html lang="bg"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Med Simulation 3D · Физиология</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
   /* Full-bleed simulator stage: the Unity canvas fills the screen, a quiet loader sits on top until ready. */
   :root {
-    --bg: #07080b;
-    --fg: #eef0f3;
-    --dim: #9aa0aa;
-    --accent: #ff6b66;
-    --track: rgba(255,255,255,0.10);
+    --bg: #080c17;
+    --fg: #eef3fb;
+    --dim: #8d9cb8;
+    --accent: #4ea1ff;
+    --track: rgba(150,175,225,0.16);
     --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     color-scheme: dark;
   }
@@ -18,12 +18,12 @@
   #loader {
     position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
     padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-    text-align: center; background: radial-gradient(ellipse at 50% 45%, #1a1416 0%, var(--bg) 70%);
+    text-align: center; background: radial-gradient(900px 600px at 82% -12%, rgba(155,123,255,0.18), transparent 70%), radial-gradient(800px 600px at -8% 4%, rgba(78,161,255,0.14), transparent 70%), var(--bg);
   }
   #loader h1 { margin: 0; font-size: clamp(22px, 5vw, 34px); font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
   #loader p { margin: 0; color: var(--dim); font-size: 14px; max-width: 34em; line-height: 1.5; }
   .bar { width: min(320px, 80vw); height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
-  .bar span { display: block; height: 100%; width: 0%; background: var(--accent); transition: width .2s ease; }
+  .bar span { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #4ea1ff, #9b7bff); transition: width .2s ease; }
   #pct { font-variant-numeric: tabular-nums; color: var(--dim); font-size: 13px; letter-spacing: .04em; }
   #err { color: var(--accent); }
   @media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
@@ -31,24 +31,25 @@
 
 </head><body><div id="stage"><canvas id="unity-canvas" tabindex="-1"></canvas></div>
 <div id="loader">
-  <h1>Физиология</h1>
-  <p>Живи модели на физиологията за студенти по медицина. На телефон дръж екрана хоризонтално.</p>
+  <div style="color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.12em">MED SIMULATION 3D</div>
+  <h1>Физиология на живо</h1>
+  <p>Живи модели на физиологията с истински 3D органи за студенти по медицина.</p>
   <div class="bar"><span id="bar"></span></div>
   <div id="pct">Зареждане… 0%</div>
   <p id="err" hidden></p>
 </div>
 
-<script src="medphysio.js?v=17"></script>
-<script src="Build/heartweb.loader.js?v=17"></script>
+<script src="medphysio.js?v=18"></script>
+<script src="Build/heartweb.loader.js?v=18"></script>
 <script>
   (function () {
     var canvas = document.getElementById("unity-canvas");
     var bar = document.getElementById("bar"), pct = document.getElementById("pct"), err = document.getElementById("err");
     var config = {
       arguments: [],
-      dataUrl: "Build/heartweb.data.unityweb?v=17",
-      frameworkUrl: "Build/heartweb.framework.js.unityweb?v=17",
-      codeUrl: "Build/heartweb.wasm.unityweb?v=17",
+      dataUrl: "Build/heartweb.data.unityweb?v=18",
+      frameworkUrl: "Build/heartweb.framework.js.unityweb?v=18",
+      codeUrl: "Build/heartweb.wasm.unityweb?v=18",
       streamingAssetsUrl: "StreamingAssets",
       companyName: "MedAtlas",
       productName: "MedAtlas",

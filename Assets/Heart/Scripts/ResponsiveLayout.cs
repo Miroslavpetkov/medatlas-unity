@@ -15,6 +15,7 @@ namespace MedAtlas.Heart
 
         CanvasScaler scaler; OrbitCamera orbit;
         RectTransform card, graphs, stats, bar, scen, par, hint;
+        readonly List<RectTransform> header = new List<RectTransform>();
         readonly Dictionary<RectTransform, RtState> saved = new Dictionary<RectTransform, RtState>();
         RectTransform tabsRoot; UIKit.Btn[] tabs; int tab;
         bool? portrait;
@@ -33,7 +34,9 @@ namespace MedAtlas.Heart
                 var tx = t.GetComponent<Text>();
                 if (tx != null && tx.text.StartsWith("Плъзни")) l.hint = (RectTransform)t;
             }
+            foreach (var n in new[] { "Back", "AreaChip", "Title" }) { var h = F(n); if (h) l.header.Add(h); }
             foreach (var rt in new[] { l.card, l.graphs, l.stats, l.bar, l.scen, l.par }) if (rt) l.Save(rt);
+            foreach (var h in l.header) l.Save(h);
             if (l.bar) foreach (Transform c in l.bar) l.Save((RectTransform)c);
 
             l.tabsRoot = UIKit.Rect("PortraitTabs", canvas, new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0), Vector2.zero, new Vector2(1040, 60));
@@ -88,19 +91,32 @@ namespace MedAtlas.Heart
             if (hint) hint.gameObject.SetActive(false);
             tabsRoot.gameObject.SetActive(true);
             if (orbit) { orbit.DistanceScale = distScale; orbit.ViewOffsetY = 0.13f; orbit.ViewOffsetX = 0f; }
+            // phone: a bigger header (back button, system chip, title)
+            const float HS = 1.7f;
+            foreach (var h in header) { h.localScale = new Vector3(HS, HS, 1); h.anchoredPosition = saved[h].pos * HS; if (h.name == "Title") h.sizeDelta = new Vector2(1000 / HS, h.sizeDelta.y); }
 
             // control bar: wrap the buttons on rows of the screen width
             float x = 12, row = 0; const float BS = 1.2f, W = 1040 / BS, rowH = 56;
             var kids = new List<RectTransform>();
             foreach (Transform c in bar) kids.Add((RectTransform)c);
             kids.Sort((a, b) => saved[a].pos.x.CompareTo(saved[b].pos.x));
+            var rows = new List<List<RectTransform>> { new List<RectTransform>() };
             foreach (var c in kids)
             {
                 float w = saved[c].size.x;
-                if (x + w > W - 8) { x = 12; row++; }
-                c.anchorMin = c.anchorMax = new Vector2(0, 1); c.pivot = new Vector2(0, 1);
-                c.anchoredPosition = new Vector2(x, -10 - row * rowH);
-                x += w + 8;
+                if (x + w > W - 8) { x = 12; row++; rows.Add(new List<RectTransform>()); }
+                rows[(int)row].Add(c); x += w + 8;
+            }
+            // each row centred, so the bar is symmetric
+            for (int r = 0; r < rows.Count; r++)
+            {
+                float rw = -8; foreach (var c in rows[r]) rw += saved[c].size.x + 8;
+                float cx = (W - rw) / 2;
+                foreach (var c in rows[r])
+                {
+                    c.anchorMin = c.anchorMax = new Vector2(0, 1); c.pivot = new Vector2(0, 1);
+                    c.anchoredPosition = new Vector2(cx, -10 - r * rowH); cx += saved[c].size.x + 8;
+                }
             }
             bar.anchorMin = bar.anchorMax = new Vector2(0, 0); bar.pivot = new Vector2(0, 0);
             bar.anchoredPosition = new Vector2(20, 16); bar.sizeDelta = new Vector2(W, (row + 1) * rowH + 12);

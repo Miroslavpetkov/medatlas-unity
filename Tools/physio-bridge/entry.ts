@@ -27,7 +27,7 @@ function def(m: any) {
 }
 
 const api = {
-  list: () => JSON.stringify(PHYSIO.map((m) => ({ id: m.id, title: bg(m.title), area: m.area, icon: m.icon }))),
+  list: () => JSON.stringify(PHYSIO.map((m) => ({ id: m.id, title: bg(m.title), area: m.area, icon: m.icon, summary: bg(m.summary), presets: m.presets.length, charts: m.charts.length + (m.xy?.length ?? 0), controls: m.sliders.length + (m.toggles?.length ?? 0) }))),
   def: (id: string) => JSON.stringify(def(find(id))),
   create: (id: string, valuesJson: string) => {
     const m = find(id);
