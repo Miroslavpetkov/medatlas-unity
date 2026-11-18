@@ -7,7 +7,7 @@ namespace MedAtlas.Heart
     /// <summary>Loads the large model files from StreamingAssets (separate web files instead of one huge data bundle).</summary>
     public static class ModelFiles
     {
-        public const string Version = "17";
+        public const string Version = "18";
         public static IEnumerator Load(string file, System.Action<byte[]> done)
         {
             string path = System.IO.Path.Combine(Application.streamingAssetsPath, file);

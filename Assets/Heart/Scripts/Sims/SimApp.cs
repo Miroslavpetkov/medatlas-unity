@@ -262,7 +262,7 @@ namespace MedAtlas.Sims
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             var credit = UIKit.Label(C, "Физиологичен модел: Med Simulation 3D. Само за обучение.", 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(900, 18);
-            layout = ResponsiveLayout.Attach(C, orbit);
+            layout = ResponsiveLayout.Attach(C, orbit, 1.75f);
             layout.LandscapeOffsetX = 0.03f;
             LayoutCard();
         }
