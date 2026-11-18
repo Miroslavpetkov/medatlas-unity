@@ -43,15 +43,15 @@ namespace MedAtlas.Heart
         Part highlighted;
         Material highlightMat;
 
-        public void Build()
+        public void Build(byte[] data)
         {
             litShader = Shader.Find("Universal Render Pipeline/Lit");
             xrayShader = Shader.Find("MedAtlas/XRay");
-            var ta = Resources.Load<TextAsset>("heart_model");
+
             var lm = Resources.Load<TextAsset>("heart_landmarks");
-            if (ta == null) { Debug.LogError("heart_model.bytes missing"); return; }
+            if (data == null) { Debug.LogError("heart_model.bytes missing"); return; }
             ParseLandmarks(lm.text);
-            using (var br = new BinaryReader(new MemoryStream(ta.bytes)))
+            using (var br = new BinaryReader(new MemoryStream(data)))
             {
                 var magic = Encoding.ASCII.GetString(br.ReadBytes(4));
                 if (magic != "HRT1" && magic != "HRT2") { Debug.LogError("bad heart model"); return; }

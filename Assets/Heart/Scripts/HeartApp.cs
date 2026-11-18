@@ -41,15 +41,19 @@ namespace MedAtlas.Heart
             new Color(0.35f, 0.75f, 0.65f, 0.9f)
         };
 
-        void Start()
+        bool ready;
+
+        System.Collections.IEnumerator Start()
         {
             Application.targetFrameRate = 60;
-            BuildStudio();
+            BuildStudio(out cam, out orbit);
             model = new CardiacModel();
 
             var root = new GameObject("Heart");
             heart = root.AddComponent<HeartModel>();
-            heart.Build();
+            byte[] data = null;
+            yield return ModelFiles.Load("heart_model.wasm", d => data = d);
+            heart.Build(data);
             // the model is in anatomical position: +x = patient's left, +y = up, +z = posterior
             root.transform.position = -heart.Bounds.center;
 
@@ -64,7 +68,9 @@ namespace MedAtlas.Heart
             BuildUI();
             SetInternal(false);
             orbit.OnTap = OnTap;
+            ready = true;
             var args = System.Environment.GetCommandLineArgs();
+            if (System.Array.IndexOf(args, "-lungs") >= 0) { UnityEngine.SceneManagement.SceneManager.LoadScene("Lungs"); yield break; }
             for (int i = 0; i < args.Length - 1; i++) if (args[i] == "-autoshot") StartCoroutine(AutoShot(args[i + 1]));
         }
 
@@ -88,7 +94,7 @@ namespace MedAtlas.Heart
         }
 
         // ---------------------------------------------------------------- studio
-        void BuildStudio()
+        public static void BuildStudio(out Camera cam, out OrbitCamera orbit)
         {
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -139,7 +145,7 @@ namespace MedAtlas.Heart
             vol.sharedProfile = prof;
         }
 
-        static Cubemap StudioCubemap()
+        public static Cubemap StudioCubemap()
         {
             int n = 64;
             var cube = new Cubemap(n, TextureFormat.RGBAHalf, true);
@@ -202,6 +208,7 @@ namespace MedAtlas.Heart
 
             // title
             UIKit.LabelAt(C, "Сърце", 38, UIKit.TextMain, new Vector2(44, -30), new Vector2(600, 50), UIKit.SemiBold);
+            SceneTabs.Add(C, "Heart");
             UIKit.LabelAt(C, "Cor  ·  Сърдечен цикъл (Cyclus cardiacus)", 18, UIKit.TextDim, new Vector2(46, -80), new Vector2(700, 30), UIKit.Italic);
 
             // phase card (left)
@@ -293,6 +300,7 @@ namespace MedAtlas.Heart
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = Vector2.zero; crt.pivot = Vector2.zero; crt.anchoredPosition = new Vector2(40, 6); crt.sizeDelta = new Vector2(700, 20);
             var hint = UIKit.Label(C, "Плъзни – въртене · колелце / два пръста – мащаб · десен бутон – преместване · клик върху част – име", 13, new Color(1, 1, 1, 0.38f), null, TextAnchor.UpperLeft);
             var hrt = hint.rectTransform; hrt.anchorMin = hrt.anchorMax = new Vector2(0, 1); hrt.pivot = new Vector2(0, 1); hrt.anchoredPosition = new Vector2(46, -104); hrt.sizeDelta = new Vector2(900, 20);
+            PortraitHint.Add(C);
         }
 
         void LayoutCard()
@@ -469,7 +477,7 @@ namespace MedAtlas.Heart
             }
         }
 
-        static Texture2D RadialTexture()
+        public static Texture2D RadialTexture()
         {
             int w = 256, h = 144;
             var t = new Texture2D(w, h, TextureFormat.RGBA32, false);
@@ -538,7 +546,7 @@ namespace MedAtlas.Heart
         // ---------------------------------------------------------------- loop
         void Update()
         {
-            if (model == null) return;
+            if (model == null || !ready) return;
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             float phys = paused ? 0f : dt * speed;
             if (phys > 0f) model.Advance(phys);

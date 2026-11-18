@@ -11,6 +11,7 @@ namespace MedAtlas.Heart.EditorTools
     public static class HeartProjectSetup
     {
         public const string ScenePath = "Assets/Heart/Scenes/Heart.unity";
+        public const string LungsScenePath = "Assets/Heart/Scenes/Lungs.unity";
         const string MatDir = "Assets/Heart/Resources/Materials";
         const string PrefKey = "MedAtlas.Heart.SceneOpened.v1";
 
@@ -42,9 +43,10 @@ namespace MedAtlas.Heart.EditorTools
         {
             EnsureMaterials();
             if (!File.Exists(ScenePath)) CreateScene();
+            if (!File.Exists(LungsScenePath)) CreateLungsScene();
             var scenes = EditorBuildSettings.scenes;
-            if (scenes.Length == 0 || scenes[0].path != ScenePath)
-                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            if (scenes.Length < 2 || scenes[0].path != ScenePath || scenes[1].path != LungsScenePath)
+                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true), new EditorBuildSettingsScene(LungsScenePath, true) };
         }
 
         static void EnsureMaterials()
@@ -100,6 +102,16 @@ namespace MedAtlas.Heart.EditorTools
             AssetDatabase.Refresh();
         }
 
+        static void CreateLungsScene()
+        {
+            var prev = SceneManager.GetActiveScene().path;
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            new GameObject("LungApp").AddComponent<MedAtlas.Lungs.LungApp>();
+            EditorSceneManager.SaveScene(scene, LungsScenePath);
+            AssetDatabase.Refresh();
+            if (!string.IsNullOrEmpty(prev) && File.Exists(prev)) EditorSceneManager.OpenScene(prev);
+        }
+
         // -------- batch entry points (used from the command line)
         public static void BatchSetup()
         {
@@ -128,10 +140,11 @@ namespace MedAtlas.Heart.EditorTools
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;
+            PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.WebGL, ManagedStrippingLevel.Medium);
             PlayerSettings.productName = "MedAtlas - Сърце";
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
+                scenes = new[] { ScenePath, LungsScenePath },
                 locationPathName = "D:/tmp/heartweb",
                 target = BuildTarget.WebGL,
                 options = BuildOptions.None
@@ -141,13 +154,15 @@ namespace MedAtlas.Heart.EditorTools
             Debug.Log("HEART_WEBGL_RESULT " + rep.summary.result);
         }
 
+        public static string BuildOut = "D:/tmp/heartbuild/MedAtlas.exe";
+
         public static void BuildWindowsTest()
         {
             EnsureAssets();
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { ScenePath },
-                locationPathName = "D:/tmp/heartbuild/Heart.exe",
+                scenes = new[] { ScenePath, LungsScenePath },
+                locationPathName = BuildOut,
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.None
             };

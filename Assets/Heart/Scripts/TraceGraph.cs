@@ -14,6 +14,8 @@ namespace MedAtlas.Heart
         public byte[] Phases; public Color[] PhaseColors; public float BandHeight = 0f;
         public byte[] Marks;
         public float Cursor = -1;
+        public float MarkerX = -1, MarkerY = -1;   // normalized 0..1 position of a highlighted point
+        public Color MarkerColor = Color.white;
         public Color GridColor = new Color(1, 1, 1, 0.07f);
         public Color CursorColor = new Color(1, 1, 1, 0.55f);
 
@@ -78,6 +80,14 @@ namespace MedAtlas.Heart
                     Vector2 b = new Vector2(plot.xMin + plot.width * (i + 1) / (n - 1), Y(plot, s.Data[i + 1]));
                     Line(vh, a, b, s.Width, s.Color);
                 }
+            }
+
+            if (MarkerX >= 0)
+            {
+                float mx = plot.xMin + plot.width * Mathf.Clamp01(MarkerX), my = plot.yMin + plot.height * Mathf.Clamp01(MarkerY);
+                Quad(vh, new Vector2(mx - 5, my - 5), new Vector2(mx + 5, my + 5), MarkerColor);
+                Quad(vh, new Vector2(mx - 0.5f, plot.yMin), new Vector2(mx + 0.5f, my), new Color(1, 1, 1, 0.25f));
+                Quad(vh, new Vector2(plot.xMin, my - 0.5f), new Vector2(mx, my + 0.5f), new Color(1, 1, 1, 0.25f));
             }
 
             if (Cursor >= 0)
