@@ -40,6 +40,18 @@
 </div>
 
 <script src="medphysio.js?v=22"></script>
+<script>
+  // Skeletal and smooth muscle now live in the web app's own section (#muscle), with the sarcomere,
+  // cross-bridge cycle, triad and smooth-muscle pathway in 3D. Hide them from this menu.
+  (function () {
+    var HIDE = ['muscle', 'smooth'];
+    var list = window.MedPhysio && window.MedPhysio.list;
+    if (!list) return;
+    window.MedPhysio.list = function () {
+      return JSON.stringify(JSON.parse(list()).filter(function (m) { return HIDE.indexOf(m.id) < 0; }));
+    };
+  })();
+</script>
 <script src="Build/heartweb.loader.js?v=22"></script>
 <script>
   (function () {
