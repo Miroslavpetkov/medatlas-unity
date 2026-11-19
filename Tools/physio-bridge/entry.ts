@@ -2,6 +2,8 @@
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
 import { JOURNEYS } from './src/journeys';
 const PHYSIO: any[] = [...JOURNEYS, ...BASE];
+// Skeletal and smooth muscle moved to the web app's own section (#muscle): left out of the menu.
+const HIDDEN = ['muscle', 'smooth'];
 
 const bg = (t: any): any => (t && typeof t === 'object' && 'bg' in t ? t.bg : t);
 const find = (id: string) => PHYSIO.find((m) => m.id === id)!;
@@ -27,7 +29,7 @@ function def(m: any) {
 }
 
 const api = {
-  list: () => JSON.stringify(PHYSIO.map((m) => ({ id: m.id, title: bg(m.title), area: m.area, icon: m.icon, summary: bg(m.summary), presets: m.presets.length, charts: m.charts.length + (m.xy?.length ?? 0), controls: m.sliders.length + (m.toggles?.length ?? 0) }))),
+  list: () => JSON.stringify(PHYSIO.filter((m) => !HIDDEN.includes(m.id)).map((m) => ({ id: m.id, title: bg(m.title), area: m.area, icon: m.icon, summary: bg(m.summary), presets: m.presets.length, charts: m.charts.length + (m.xy?.length ?? 0), controls: m.sliders.length + (m.toggles?.length ?? 0) }))),
   def: (id: string) => JSON.stringify(def(find(id))),
   create: (id: string, valuesJson: string) => {
     const m = find(id);
