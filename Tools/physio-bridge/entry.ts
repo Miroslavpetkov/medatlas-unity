@@ -1,7 +1,42 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
-import { JOURNEYS } from './src/journeys';
-const PHYSIO: any[] = [...JOURNEYS, ...BASE];
+// "Пътят през тялото" (the journeys) now live in the web list too (web #88–#93), so Unity uses them from there.
+// Journeys first, so they open the list as before.
+const PHYSIO: any[] = [...BASE.filter((m: any) => m.area === 'Journey'), ...BASE.filter((m: any) => m.area !== 'Journey')];
+
+/** The web journey scene and Unity's JourneyView read the same q/s/k, b/bs, ur, vo protocol, with two differences:
+ *  the kinds 6/7 are swapped (web 6 = vomitus, 7 = faeces; Unity 6 = faeces, 7 = vomitus) and Unity lights more
+ *  organ parts. The extra glows are derived here from what the model already reports, so the models stay pure. */
+const COLON = ['Ascending colon', 'Transverse colon', 'Descending colon', 'Sigmoid colon'];
+function forUnity(id: string, r: Record<string, number>): Record<string, number> {
+  const o: Record<string, number> = { ...r };
+  const up = (k: string, v: number) => { o[k] = Math.max(o[k] ?? 0, v); };
+  for (let i = 0; i < 24; i++) {
+    const k = o['k' + i];
+    if (k === 6) o['k' + i] = 7; else if (k === 7) o['k' + i] = 6;
+    const p = o['q' + i];
+    if (p === undefined || p < 0 || p >= 11) continue;
+    if (p < 1) up('G_Tongue', 1);
+    else if (p < 3) up('G_pharynx', 1);
+    else if (p < 4) up('G_Oesophagus', 0.8);
+    else if (p >= 5 && p < 6) up('G_Duodenum', 0.6);
+    else if (p >= 7) up('G_' + COLON[Math.min(3, Math.floor(p) - 7)], 0.6);
+  }
+  if ('ur' in r) up('G_Kidney', Math.max(0.1, r.ur));
+  if (id === 'swallow') {
+    const ph = (o.G_pharynx ?? 0) > 0 ? 1 : 0; // soft palate and epiglottis close the airways while the bolus is in the pharynx
+    up('G_Epiglottis', ph); up('G_Soft palate', ph); up('G_Uvula', ph);
+    if ((r.br ?? 10) < 5) up('G_Trachea', 0.6);
+  }
+  if (id === 'defecation' && (r.eas ?? 0) > 120) up('G_sphincter', 1);
+  if (id === 'vomit') {
+    if ((r.br ?? 1) < 0.5) up('G_Trachea', 0.6);
+    if ((r.les ?? 100) < 50) up('G_Oesophagus', 1);
+    if ((r.ues ?? 100) < 50) up('G_Epiglottis', 1);
+  }
+  return o;
+}
+const readFor = (s: any) => (s.m.area === 'Journey' ? forUnity(s.m.id, s.inst.read()) : s.inst.read());
 
 const bg = (t: any): any => (t && typeof t === 'object' && 'bg' in t ? t.bg : t);
 const find = (id: string) => PHYSIO.find((m) => m.id === id)!;
@@ -42,13 +77,13 @@ const api = {
     const s = insts[h]; const sd = s.m.sampleDt ?? 0.004;
     const samples: any[] = [];
     let left = dt + s.acc;
-    while (left >= sd) { s.inst.advance(sd); left -= sd; samples.push(s.inst.read()); }
+    while (left >= sd) { s.inst.advance(sd); left -= sd; samples.push(readFor(s)); }
     s.acc = left;
     let out = samples;
     if (samples.length > maxSamples) { out = []; const k = samples.length / maxSamples; for (let i = 0; i < maxSamples; i++) out.push(samples[Math.floor(i * k)]); }
     const ph = s.inst.phase();
     const st = s.inst.stats();
-    return JSON.stringify({ t: s.inst.t, samples: out, now: samples.length ? samples[samples.length - 1] : s.inst.read(), stats: st,
+    return JSON.stringify({ t: s.inst.t, samples: out, now: samples.length ? samples[samples.length - 1] : readFor(s), stats: st,
       phase: { title: bg(ph.title), text: bg(ph.text), color: ph.color ?? '' } });
   },
   curve: (h: number, i: number) => { const s = insts[h]; const x = s.m.xy[i]; return JSON.stringify(x.curve ? x.curve(s.v) : []); },
