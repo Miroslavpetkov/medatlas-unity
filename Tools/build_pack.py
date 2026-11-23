@@ -7,6 +7,7 @@ argv = sys.argv[sys.argv.index('--') + 1:]
 SRC, SPEC, OUT = argv[0], argv[1], argv[2]
 spec = json.load(open(SPEC, encoding='utf8'))
 CLS = spec['objects']; CONTRACT = set(spec.get('contract', []))
+MAXF = spec.get('maxFaces', 30000)  # per-part face budget; lower it in a spec to keep a pack light
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 with bpy.data.libraries.load(SRC, link=False) as (src, dst):
@@ -23,10 +24,10 @@ for o in list(sc.objects):
     if o.matrix_world.determinant() < 0: me.flip_normals()
     b = bmesh.new(); b.from_mesh(me); bmesh.ops.recalc_face_normals(b, faces=b.faces[:])
     # keep packs light: decimate very dense parts
-    if len(b.faces) > 30000:
+    if len(b.faces) > MAXF:
         b.to_mesh(me); b.free()
         no = bpy.data.objects.new('tmp', me); sc.collection.objects.link(no)
-        m = no.modifiers.new('d', 'DECIMATE'); m.ratio = 30000 / len(me.polygons)
+        m = no.modifiers.new('d', 'DECIMATE'); m.ratio = MAXF / len(me.polygons)
         me2 = bpy.data.meshes.new_from_object(no.evaluated_get(bpy.context.evaluated_depsgraph_get()))
         bpy.data.objects.remove(no); me = me2
     else:

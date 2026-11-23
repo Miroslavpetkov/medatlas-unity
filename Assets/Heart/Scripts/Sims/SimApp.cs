@@ -35,7 +35,7 @@ namespace MedAtlas.Sims
         readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
         const int N = 400;
         float sampleDt = 0.004f; float curveTimer;
-        float statsH; float opacity = 1f; bool journeyPack;
+        float statsH; float opacity = 1f; bool journeyPack; string packName;
         void ApplyOpacity(float o)
         {
             opacity = o;
@@ -95,11 +95,35 @@ namespace MedAtlas.Sims
                 case "thyroid": case "calcium": return "neck";
                 case "cycle": case "pregnancy-birth": return "uterus";   // HRA uterus + ovaries (CC BY 4.0), Tools/build_uterus.py
                 case "testis": return "male";   // Z-Anatomy male genital organs, Tools/spec_male.json
-                case "thermo": case "human": case "exercise": case "special": case "skin": return null;
+                // whole-body sims: heart, lungs, great vessels, liver, kidneys, spleen (Tools/spec_torso.json)
+                case "human": case "exercise": case "thermo": case "acid-base": case "immune": case "blood": return "torso";
+                case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
             if (area == "Kidney") return "kidney";
             return null;
+        }
+
+        /// <summary>The "path through the body" journeys: they use the body pack with the journey view (paths, glass organs).</summary>
+        public static bool IsJourney(string id) =>
+            id == "food-journey" || id == "gas" || id == "swallow" || id == "water-journey" || id == "defecation" || id == "vomit";
+
+        /// <summary>Camera distance so the whole pack is in view (every pack is ~3 units across its longest side).</summary>
+        static float PackDistance(string pack)
+        {
+            switch (pack)
+            {
+                case "male": return 7.6f;   // tall packs
+                case "torso": return 7.0f;
+                default: return 5.6f;
+            }
+        }
+
+        /// <summary>Start opacity (1-100): glass where outer parts hide what the simulation is about.</summary>
+        static float StartOpacity(string id, string pack)
+        {
+            if (IsJourney(id)) return 35;
+            switch (pack) { case "torso": return 60; default: return 100; }
         }
 
         public static MicroScene.Kind? MicroFor(string id)
@@ -108,7 +132,7 @@ namespace MedAtlas.Sims
             {
                 case "membrane": case "cardiac-ap": case "synapse-receptors": case "neuron-glia": case "signal": return MicroScene.Kind.Membrane;
                 case "action-potential": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "blood": case "bloodgroups": case "immune": case "acid-base": case "thermo": case "skin": return MicroScene.Kind.Vessel;
+                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups": case "skin": return MicroScene.Kind.Vessel;
             }
             return null;
         }
@@ -127,20 +151,20 @@ namespace MedAtlas.Sims
             var pack = PackFor(area, id);
             if (pack != null)
             {
-                journeyPack = pack == "body";
+                journeyPack = IsJourney(id); packName = pack;
                 var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ);
                 StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d =>
                 {
                     organ.Build(d); root.transform.position = -organ.Bounds.center;
-                    if (pack != "body" && opacity < 0.995f) organ.SetOpacity(opacity);
-                    if (pack == "body" && organ.Loaded)
+                    if (!journeyPack && opacity < 0.995f) organ.SetOpacity(opacity);
+                    if (journeyPack && organ.Loaded)
                     {
                         var fr = JourneyView.Framing(id); var b = organ.Bounds;
                         orbit.Target = new Vector3(0, (fr.yFrac - 0.5f) * b.size.y, 0); orbit.SetView(-18f, 6f, fr.dist);
                         StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); journey.Opacity = opacity; }));
                     }
                 }));
-                orbit.Distance = pack == "body" ? 6.4f : pack == "male" ? 7.6f : 5.6f; orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                orbit.Distance = journeyPack ? 6.4f : PackDistance(pack); orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
                 return;
             }
             if (area == "Heart" || area == "Circulation")
@@ -259,7 +283,7 @@ namespace MedAtlas.Sims
             if (heart != null || lungs != null || organ != null)
             {
                 // opacity of the organs, 1–100 (100 = solid); the body journeys start as glass so the food stays visible
-                float start = journeyPack ? 35 : 100; opacity = start / 100f;
+                float start = organ != null ? StartOpacity(SelectedId, packName) : 100; opacity = start / 100f;
                 var box = UIKit.Rect("Opacity", bar, new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(x0, 0), new Vector2(300, H));
                 UIKit.PanelImage(box, UIKit.ButtonOff);
                 UIKit.LabelAt(box, "Плътност", 15, UIKit.TextMain, new Vector2(14, -12), new Vector2(90, 22), UIKit.SemiBold);

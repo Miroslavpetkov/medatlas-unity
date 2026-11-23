@@ -64,6 +64,13 @@ namespace MedAtlas.Sims
                 case "pregnancy-birth": G(new[] { "uterus" }, Hot, N(now, "uterus")); G(new[] { "cervix" }, Warm, N(now, "dil")); break;
                 // male genital organs (organ_male pack): Leydig testosterone lights the testes, sperm output the epididymis and ducts, inhibin (Sertoli) the glands
                 case "testis": G(new[] { "testis" }, Warm, N(now, "tt")); G(new[] { "duct" }, Cool, N(now, "sp")); G(new[] { "gland" }, Warm, N(now, "inh") * 0.6f); break;
+                // whole-body sims (organ_torso pack)
+                case "human": G(new[] { "heart" }, Hot, N(now, "co")); G(new[] { "lung" }, Cool, N(now, "rr")); G(new[] { "artery" }, Warm, N(now, "map")); break;
+                case "exercise": G(new[] { "heart" }, Hot, N(now, "hr")); G(new[] { "lung" }, Cool, N(now, "ve")); G(new[] { "Liver" }, Warm, N(now, "lac")); break;
+                case "thermo": G(new[] { "Liver" }, Warm, N(now, "m")); G(new[] { "heart", "artery" }, Hot, N(now, "tc")); G(new[] { "lung" }, Cool, N(now, "evap")); break;
+                case "acid-base": G(new[] { "lung" }, Cool, N(now, "ve")); G(new[] { "artery" }, Hot, N(now, "pco2")); G(new[] { "kidney" }, Warm, N(now, "nae")); break;
+                case "immune": G(new[] { "Spleen" }, Warm, Mathf.Max(N(now, "igm"), N(now, "igg"))); G(new[] { "artery", "vein" }, Hot, N(now, "p")); break;
+                case "blood": G(new[] { "kidney" }, Warm, N(now, "epo")); G(new[] { "Liver" }, Cool, N(now, "fer")); G(new[] { "Spleen" }, Hot, N(now, "ret")); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
