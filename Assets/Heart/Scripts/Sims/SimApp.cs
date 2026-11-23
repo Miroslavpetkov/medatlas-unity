@@ -97,6 +97,11 @@ namespace MedAtlas.Sims
                 case "testis": return "male";   // Z-Anatomy male genital organs, Tools/spec_male.json
                 // whole-body sims: heart, lungs, great vessels, liver, kidneys, spleen (Tools/spec_torso.json)
                 case "human": case "exercise": case "thermo": case "acid-base": case "immune": case "blood": return "torso";
+                case "venous-return": case "reflex": return "leg";      // thigh and calf muscles, bones, nerves, leg veins (spec_leg.json)
+                case "vision": return "eye";
+                case "hearing": case "vestibular": return "ear";
+                case "chemo": return "senses_head";                     // tongue, nasal mucosa, olfactory nerves
+                case "ans": return "ans";                               // spinal cord, sympathetic trunks, vagus and target organs
                 case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
@@ -113,8 +118,9 @@ namespace MedAtlas.Sims
         {
             switch (pack)
             {
-                case "male": return 7.6f;   // tall packs
-                case "torso": return 7.0f;
+                case "male": case "ans": return 7.6f;   // tall packs
+                case "torso": case "eye": case "ear": return 7.0f;
+                case "leg": case "senses_head": return 6.6f;
                 default: return 5.6f;
             }
         }
@@ -123,7 +129,7 @@ namespace MedAtlas.Sims
         static float StartOpacity(string id, string pack)
         {
             if (IsJourney(id)) return 35;
-            switch (pack) { case "torso": return 60; default: return 100; }
+            switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }
         }
 
         public static MicroScene.Kind? MicroFor(string id)
@@ -164,7 +170,7 @@ namespace MedAtlas.Sims
                         StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); journey.Opacity = opacity; }));
                     }
                 }));
-                orbit.Distance = journeyPack ? 6.4f : PackDistance(pack); orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                orbit.Distance = journeyPack ? 6.4f : PackDistance(pack); orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = pack == "ear" ? new Vector3(0.75f, 0, 0) : Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;   // ear: eardrum and ossicles sit at +x, keep them clear of the charts
                 return;
             }
             if (area == "Heart" || area == "Circulation")

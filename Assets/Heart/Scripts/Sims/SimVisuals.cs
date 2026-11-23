@@ -33,16 +33,16 @@ namespace MedAtlas.Sims
             {
                 // nervous system: the cortical area that does the work lights up with the model's activity
                 case "motor": G(new[] { "Precentral", "Paracentral" }, Warm, N(now, "direct")); G(new[] { "cerebellum" }, Cool, N(now, "indirect")); break;
-                case "vision": G(new[] { "occipital", "Lingual", "Cuneus" }, Warm, Mathf.Max(N(now, "cone"), N(now, "rod"))); break;
-                case "hearing": G(new[] { "Superior temporal", "Temporal pole" }, Warm, N(now, "rate")); break;
+                case "vision": G(new[] { "retina" }, Warm, Mathf.Max(N(now, "cone"), N(now, "rod"))); G(new[] { "iris" }, Cool, N(now, "pupil")); G(new[] { "lens" }, Warm, N(now, "accom")); break;
+                case "hearing": G(new[] { "eardrum", "ossicle" }, Cool, N(now, "disp")); G(new[] { "cochlea", "Cochlear nerve" }, Warm, N(now, "rate")); break;
                 case "touch": G(new[] { "Postcentral", "Supramarginal" }, Hot, Mathf.Max(N(now, "pain"), N(now, "fast"))); break;
                 case "speech": G(new[] { "inferior frontal" }, Warm, N(now, "flu")); G(new[] { "Superior temporal", "Supramarginal" }, Cool, N(now, "comp")); break;
                 case "memory": G(new[] { "Medial occipitotemporal", "Parahippocampal" }, Warm, N(now, "stored")); G(new[] { "Superior frontal", "Middle frontal" }, Cool, N(now, "held")); break;
                 case "sleep": G(new[] { "cortex" }, Cool, N(now, "alert")); G(new[] { "hypophysis", "Thalamus" }, Warm, N(now, "mel")); break;
-                case "chemo": G(new[] { "Insula", "Orbital" }, Warm, Mathf.Max(N(now, "gust"), N(now, "smell"))); break;
-                case "ans": G(new[] { "hypophysis", "brainstem" }, Hot, N(now, "symp")); G(new[] { "Medulla" }, Cool, N(now, "para")); break;
-                case "vestibular": G(new[] { "cerebellum", "brainstem" }, Cool, N(now, "felt")); break;
-                case "reflex": G(new[] { "brainstem", "Precentral" }, Warm, N(now, "fExt")); break;
+                case "chemo": G(new[] { "tongue" }, Warm, N(now, "gust")); G(new[] { "olfactory", "nasal" }, Cool, N(now, "smell")); break;
+                case "ans": G(new[] { "sympathetic" }, Hot, N(now, "symp")); G(new[] { "vagus" }, Cool, N(now, "para")); G(new[] { "heart" }, Warm, N(now, "hr")); G(new[] { "Stomach" }, Cool, N(now, "gut")); break;
+                case "vestibular": G(new[] { "vestibule" }, Cool, N(now, "felt")); G(new[] { "Vestibular nerve" }, Warm, N(now, "omega")); break;
+                case "reflex": G(new[] { "Rectus femoris", "Vastus" }, Hot, N(now, "fExt")); G(new[] { "biceps femoris" }, Cool, N(now, "fFlex")); G(new[] { "Femoral nerve" }, Warm, N(now, "ia")); break;
                 case "action-potential": case "synapse-receptors": G(new[] { "cortex" }, Warm, N(now, "v")); break;
                 case "membrane": G(new[] { "cortex" }, Warm, N(now, "vm")); break;
                 case "neuron-glia": G(new[] { "cortex" }, Hot, N(now, "ke")); break;
@@ -71,6 +71,8 @@ namespace MedAtlas.Sims
                 case "acid-base": G(new[] { "lung" }, Cool, N(now, "ve")); G(new[] { "artery" }, Hot, N(now, "pco2")); G(new[] { "kidney" }, Warm, N(now, "nae")); break;
                 case "immune": G(new[] { "Spleen" }, Warm, Mathf.Max(N(now, "igm"), N(now, "igg"))); G(new[] { "artery", "vein" }, Hot, N(now, "p")); break;
                 case "blood": G(new[] { "kidney" }, Warm, N(now, "epo")); G(new[] { "Liver" }, Cool, N(now, "fer")); G(new[] { "Spleen" }, Hot, N(now, "ret")); break;
+                // leg veins and the calf muscle pump (organ_leg pack)
+                case "venous-return": G(new[] { "vein" }, Cool, N(now, "pool")); G(new[] { "gastrocnemius", "Soleus" }, Warm, N(now, "co")); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
