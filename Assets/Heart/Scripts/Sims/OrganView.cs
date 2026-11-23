@@ -20,6 +20,12 @@ namespace MedAtlas.Sims
             {"bone", new Color(0.90f, 0.87f, 0.80f)}, {"muscle", new Color(0.62f, 0.13f, 0.13f)}, {"muscle2", new Color(0.55f, 0.12f, 0.12f)}, {"intestine", new Color(0.84f, 0.60f, 0.55f)},
             {"uterus", new Color(0.78f, 0.46f, 0.44f)}, {"cervix", new Color(0.84f, 0.58f, 0.55f)}, {"ovary", new Color(0.90f, 0.78f, 0.62f)}, {"tube", new Color(0.84f, 0.56f, 0.50f)},
             {"testis", new Color(0.86f, 0.72f, 0.66f)}, {"duct", new Color(0.88f, 0.78f, 0.62f)}, {"erectile", new Color(0.72f, 0.36f, 0.38f)},
+            {"heart", new Color(0.66f, 0.16f, 0.15f)}, {"lung", new Color(0.86f, 0.62f, 0.62f)}, {"nerve", new Color(0.93f, 0.86f, 0.55f)},
+            {"cornea", new Color(0.80f, 0.90f, 0.96f)}, {"sclera", new Color(0.95f, 0.94f, 0.90f)}, {"iris", new Color(0.36f, 0.50f, 0.62f)}, {"lens", new Color(0.92f, 0.88f, 0.70f)},
+            {"retina", new Color(0.86f, 0.42f, 0.30f)}, {"vitreous", new Color(0.82f, 0.88f, 0.92f)}, {"ciliary", new Color(0.50f, 0.28f, 0.24f)},
+            {"eardrum", new Color(0.90f, 0.80f, 0.72f)}, {"ossicle", new Color(0.92f, 0.88f, 0.78f)}, {"cochlea", new Color(0.88f, 0.80f, 0.70f)}, {"vestibule", new Color(0.84f, 0.78f, 0.70f)},
+            {"tongue", new Color(0.82f, 0.45f, 0.45f)}, {"nasal", new Color(0.86f, 0.56f, 0.54f)}, {"olfactory", new Color(0.93f, 0.86f, 0.55f)},
+            {"sympathetic", new Color(0.95f, 0.80f, 0.45f)}, {"vagus", new Color(0.90f, 0.90f, 0.60f)}, {"cord", new Color(0.94f, 0.90f, 0.80f)},
         };
 
         readonly List<(SkinnedMeshRenderer r, int key)> contract = new List<(SkinnedMeshRenderer, int)>();
