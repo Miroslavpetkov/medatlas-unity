@@ -19,6 +19,7 @@ namespace MedAtlas.Sims
             {"parathyroid", new Color(0.82f, 0.60f, 0.30f)}, {"cartilage", new Color(0.86f, 0.86f, 0.80f)}, {"airway", new Color(0.88f, 0.82f, 0.72f)},
             {"bone", new Color(0.90f, 0.87f, 0.80f)}, {"muscle", new Color(0.62f, 0.13f, 0.13f)}, {"muscle2", new Color(0.55f, 0.12f, 0.12f)}, {"intestine", new Color(0.84f, 0.60f, 0.55f)},
             {"uterus", new Color(0.78f, 0.46f, 0.44f)}, {"cervix", new Color(0.84f, 0.58f, 0.55f)}, {"ovary", new Color(0.90f, 0.78f, 0.62f)}, {"tube", new Color(0.84f, 0.56f, 0.50f)},
+            {"testis", new Color(0.86f, 0.72f, 0.66f)}, {"duct", new Color(0.88f, 0.78f, 0.62f)}, {"erectile", new Color(0.72f, 0.36f, 0.38f)},
         };
 
         readonly List<(SkinnedMeshRenderer r, int key)> contract = new List<(SkinnedMeshRenderer, int)>();

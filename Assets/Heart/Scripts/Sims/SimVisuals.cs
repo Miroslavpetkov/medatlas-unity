@@ -62,7 +62,8 @@ namespace MedAtlas.Sims
                 // female genital organs (organ_uterus pack): the follicle in the ovary grows with oestradiol, the endometrium with the cycle
                 case "cycle": G(new[] { "ovary" }, Warm, Mathf.Max(N(now, "e2"), N(now, "fol"))); G(new[] { "uterus" }, Hot, N(now, "endo")); break;
                 case "pregnancy-birth": G(new[] { "uterus" }, Hot, N(now, "uterus")); G(new[] { "cervix" }, Warm, N(now, "dil")); break;
-                case "testis": G(new[] { "hypophysis" }, Warm, N(now, "lh")); G(new[] { "Thalamus" }, Cool, N(now, "fsh")); break;
+                // male genital organs (organ_male pack): Leydig testosterone lights the testes, sperm output the epididymis and ducts, inhibin (Sertoli) the glands
+                case "testis": G(new[] { "testis" }, Warm, N(now, "tt")); G(new[] { "duct" }, Cool, N(now, "sp")); G(new[] { "gland" }, Warm, N(now, "inh") * 0.6f); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
