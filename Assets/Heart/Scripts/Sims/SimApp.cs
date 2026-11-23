@@ -94,7 +94,7 @@ namespace MedAtlas.Sims
                 case "smooth": case "adrenal": case "glucose-insulin": case "digestion": case "bilirubin": case "metabolism": case "nutrition": return "abdomen";
                 case "thyroid": case "calcium": return "neck";
                 case "cycle": case "pregnancy-birth": return "uterus";   // HRA uterus + ovaries (CC BY 4.0), Tools/build_uterus.py
-                case "testis": return "brain";
+                case "testis": return "male";   // Z-Anatomy male genital organs, Tools/spec_male.json
                 case "thermo": case "human": case "exercise": case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
@@ -140,7 +140,7 @@ namespace MedAtlas.Sims
                         StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); journey.Opacity = opacity; }));
                     }
                 }));
-                orbit.Distance = pack == "body" ? 6.4f : 5.6f; orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
+                orbit.Distance = pack == "body" ? 6.4f : pack == "male" ? 7.6f : 5.6f; orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;
                 return;
             }
             if (area == "Heart" || area == "Circulation")
