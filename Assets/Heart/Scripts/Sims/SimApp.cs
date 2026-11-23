@@ -93,7 +93,8 @@ namespace MedAtlas.Sims
                 case "muscle": return "arm";
                 case "smooth": case "adrenal": case "glucose-insulin": case "digestion": case "bilirubin": case "metabolism": case "nutrition": return "abdomen";
                 case "thyroid": case "calcium": return "neck";
-                case "cycle": case "testis": return "brain";
+                case "cycle": case "pregnancy-birth": return "uterus";   // HRA uterus + ovaries (CC BY 4.0), Tools/build_uterus.py
+                case "testis": return "brain";
                 case "thermo": case "human": case "exercise": case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
@@ -271,8 +272,10 @@ namespace MedAtlas.Sims
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
             if (heart == null && lungs == null && organ == null && micro == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
-            var credit = UIKit.Label(C, "Физиологичен модел: Med Simulation 3D. Само за обучение.", 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
-            var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(900, 18);
+            string creditText = "Физиологичен модел: Med Simulation 3D. Само за обучение.";
+            if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
+            var credit = UIKit.Label(C, creditText, 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
+            var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
             layout = ResponsiveLayout.Attach(C, orbit, 1.75f);
             layout.LandscapeOffsetX = 0.03f;
             LayoutCard();
