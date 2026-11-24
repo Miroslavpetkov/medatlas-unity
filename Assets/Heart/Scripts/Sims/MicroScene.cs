@@ -379,7 +379,7 @@ namespace MedAtlas.Sims
             if (id == "capillary" || id == "lymph")
             {
                 // tissue around and a blind-ended lymph capillary below
-                Prim(PrimitiveType.Cube, new Vector3(0, -0.2f, 0), new Vector3(3.9f, 3.2f, 2.2f), Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f));
+                Prim(PrimitiveType.Cube, new Vector3(0, -0.45f, 0), new Vector3(3.9f, 2.7f, 2.2f), Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f));
                 RodX(new Vector3(0, -1.35f, 0), 3.6f, 0.32f, Glass(new Color(0.8f, 0.95f, 0.6f), 0.08f, 0.6f));
             }
         }
@@ -805,13 +805,13 @@ namespace MedAtlas.Sims
             coldMat = Lit(new Color(0.4f, 0.6f, 1f), 0.6f); warmMat = Lit(new Color(1f, 0.55f, 0.3f), 0.6f); painMat = Lit(new Color(1f, 0.85f, 0.85f), 0.6f);
             var nerve = Lit(new Color(0.95f, 0.9f, 0.6f), 0.5f);
             RodX(new Vector3(0, -0.25f, 0.3f), w * 0.95f, 0.05f, nerve);
-            void Ending(Vector3 top, Material m) { Rod(new Vector3(top.x, -0.25f, 0.3f), top, 0.025f, m); }
+            void Ending(Vector3 top, Material m) { Rod(new Vector3(top.x, -0.25f, 0.3f), top, 0.04f, m); }
             foreach (var x in new[] { -1.9f, -1.6f }) { Prim(PrimitiveType.Sphere, new Vector3(x, 0.74f, 0.3f), new Vector3(0.16f, 0.05f, 0.16f), merkelMat); Ending(new Vector3(x, 0.72f, 0.3f), merkelMat); }
             foreach (var x in new[] { -0.9f, 0.6f }) { Prim(PrimitiveType.Sphere, new Vector3(x, 0.56f, 0.3f), new Vector3(0.14f, 0.3f, 0.14f), meissMat); Ending(new Vector3(x, 0.42f, 0.3f), meissMat); }
             Prim(PrimitiveType.Sphere, new Vector3(-0.2f, 0.15f, 0.3f), new Vector3(0.42f, 0.1f, 0.1f), ruffMat); Ending(new Vector3(-0.2f, 0.12f, 0.3f), ruffMat);
             Prim(PrimitiveType.Sphere, new Vector3(1.6f, -0.75f, 0.3f), new Vector3(0.36f, 0.55f, 0.36f), pacMat); Rod(new Vector3(1.6f, -0.25f, 0.3f), new Vector3(1.6f, -0.5f, 0.3f), 0.025f, pacMat);
             // free nerve endings, each with a small bulb at its tip so its glow is visible
-            void Free(Vector3 top, Material m) { Ending(top, m); Prim(PrimitiveType.Sphere, top, Vector3.one * 0.09f, m); }
+            void Free(Vector3 top, Material m) { Ending(top, m); Prim(PrimitiveType.Sphere, top, Vector3.one * 0.14f, m); }
             Free(new Vector3(1.1f, 0.92f, 0.3f), coldMat); Free(new Vector3(1.3f, 0.92f, 0.3f), warmMat); Free(new Vector3(2.0f, 0.95f, 0.3f), painMat); Free(new Vector3(-1.25f, 0.95f, 0.3f), painMat);
             // dermal vessel (blood flow) and a sweat gland with its duct
             vesselSkinMat = Lit(new Color(0.75f, 0.12f, 0.12f), 0.6f);
@@ -833,13 +833,13 @@ namespace MedAtlas.Sims
             {
                 float merkel = F(now, "merkel", 5, 68), meiss = F(now, "meissner", 0, 94), pac = F(now, "pacinian", 0, 50), ruff = F(now, "ruffini", 5, 39);
                 float cold = F(now, "cold", 0, 8.3f), warm = F(now, "warm", 0, 7.5f), pain = Mathf.Max(F(now, "adelta", 0, 58), F(now, "cfib", 0, 53));
-                merkelMat.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.3f) * merkel * 2.5f);
-                meissMat.SetColor("_EmissionColor", new Color(1f, 0.5f, 0.75f) * meiss * 2.5f);
-                pacMat.SetColor("_EmissionColor", new Color(0.6f, 0.8f, 1f) * pac * 2.5f);
-                ruffMat.SetColor("_EmissionColor", new Color(0.5f, 1f, 0.5f) * ruff * 2.5f);
-                coldMat.SetColor("_EmissionColor", new Color(0.4f, 0.6f, 1f) * cold * 3f);
-                warmMat.SetColor("_EmissionColor", new Color(1f, 0.55f, 0.3f) * warm * 3f);
-                painMat.SetColor("_EmissionColor", new Color(1f, 0.2f, 0.2f) * pain * 3f);
+                merkelMat.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.3f) * merkel * 2f);
+                meissMat.SetColor("_EmissionColor", new Color(1f, 0.5f, 0.75f) * meiss * 2f);
+                pacMat.SetColor("_EmissionColor", new Color(0.6f, 0.8f, 1f) * pac * 2f);
+                ruffMat.SetColor("_EmissionColor", new Color(0.5f, 1f, 0.5f) * ruff * 2f);
+                coldMat.SetColor("_EmissionColor", new Color(0.4f, 0.6f, 1f) * cold * 2.5f);
+                warmMat.SetColor("_EmissionColor", new Color(1f, 0.55f, 0.3f) * warm * 2.5f);
+                painMat.SetColor("_EmissionColor", new Color(1f, 0.2f, 0.2f) * pain * 2.5f);
                 // the probe presses into the skin with the mechanical stimulus; it is tinted by a thermal stimulus
                 float press = Mathf.Max(merkel, Mathf.Max(meiss, pac)), vib = Mathf.Max(meiss, pac);
                 var p = probe.localPosition; p.y = Mathf.Lerp(p.y, 1.62f - press * 0.32f + Mathf.Sin(Time.time * 40f) * 0.03f * vib, Mathf.Clamp01(dt * 10f)); probe.localPosition = p;

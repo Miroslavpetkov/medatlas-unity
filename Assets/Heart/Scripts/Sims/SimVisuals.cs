@@ -15,6 +15,19 @@ namespace MedAtlas.Sims
 
         public SimVisuals(string id, OrganView organ) { this.id = id; this.organ = organ; }
 
+        /// <summary>The model's current slider values (they change with the scenario), for models whose channels mean different things per setting.</summary>
+        public System.Func<Dictionary<string, object>> Params;
+        float P(string key, float def)
+        {
+            var v = Params?.Invoke();
+            if (v == null || !v.TryGetValue(key, out var o)) return def;
+            if (o is double d) return (float)d;
+            if (o is bool b) return b ? 1 : 0;
+            return def;
+        }
+        float Raw(Dictionary<string, object> now, string ch) => now != null && now.TryGetValue(ch, out var o) && o is double d ? (float)d : float.NaN;
+        int lastEnv = -1;
+
         float N(Dictionary<string, object> now, string ch)
         {
             if (now == null || !now.TryGetValue(ch, out var o) || !(o is double d)) return -1;
@@ -38,7 +51,18 @@ namespace MedAtlas.Sims
                 case "touch": G(new[] { "Postcentral", "Supramarginal" }, Hot, Mathf.Max(N(now, "pain"), N(now, "fast"))); break;
                 case "speech": G(new[] { "inferior frontal" }, Warm, N(now, "flu")); G(new[] { "Superior temporal", "Supramarginal" }, Cool, N(now, "comp")); break;
                 case "memory": G(new[] { "Medial occipitotemporal", "Parahippocampal" }, Warm, N(now, "stored")); G(new[] { "Superior frontal", "Middle frontal" }, Cool, N(now, "held")); break;
-                case "sleep": G(new[] { "cortex" }, Cool, N(now, "alert")); G(new[] { "hypophysis", "Thalamus" }, Warm, N(now, "mel")); break;
+                case "sleep":
+                    {
+                        // hypnogram: 5 awake, 4 REM, 3..0 NREM 1..4 -> depth 0 (awake) .. 1 (deep NREM)
+                        float hyp = Raw(now, "hyp"); float depth = float.IsNaN(hyp) ? 0 : (hyp >= 4.5f ? 0 : hyp >= 3.5f ? 0.15f : Mathf.Clamp01((4f - hyp) / 4f));
+                        float alert = N(now, "alert");
+                        // the cortex is active awake (more with circadian alertness) and in REM, quiet in deep NREM
+                        float cx = float.IsNaN(hyp) ? Mathf.Max(0, alert) : hyp >= 4.5f ? 0.35f + 0.5f * Mathf.Max(0, alert) : hyp >= 3.5f ? 0.6f : 0.25f * (1f - depth);
+                        G(new[] { "cortex" }, Cool, cx);
+                        G(new[] { "Thalamus" }, Warm, Mathf.Max(depth, Mathf.Max(0, N(now, "mel")) * 0.6f)); // spindles / slow waves start in the thalamus; melatonin at night
+                        G(new[] { "Adenohypophysis" }, Warm, N(now, "gh"));                                      // the growth hormone pulse of deep sleep
+                        break;
+                    }
                 case "chemo": G(new[] { "tongue" }, Warm, N(now, "gust")); G(new[] { "olfactory", "nasal" }, Cool, N(now, "smell")); break;
                 case "ans": G(new[] { "sympathetic" }, Hot, N(now, "symp")); G(new[] { "vagus" }, Cool, N(now, "para")); G(new[] { "heart" }, Warm, N(now, "hr")); G(new[] { "Stomach" }, Cool, N(now, "gut")); break;
                 case "vestibular": G(new[] { "vestibule" }, Cool, N(now, "felt")); G(new[] { "Vestibular nerve" }, Warm, N(now, "omega")); break;
@@ -77,6 +101,46 @@ namespace MedAtlas.Sims
                 case "enteric": G(new[] { "Stomach" }, Warm, N(now, "stomach")); G(new[] { "Duodenum", "Jejunum" }, Warm, N(now, "small")); G(new[] { "colon", "appendix" }, Cool, N(now, "distal")); G(new[] { "artery" }, Hot, N(now, "flow")); break;
                 case "growth-prolactin": G(new[] { "Adenohypophysis" }, Warm, Mathf.Max(N(now, "gh"), N(now, "prl"))); G(new[] { "cortex" }, Cool, N(now, "sleep") * 0.5f); break;
                 case "feedback": G(new[] { "artery" }, Hot, N(now, "val")); G(new[] { "heart" }, Warm, N(now, "u")); break;
+                // regional blood flow (torso pack)
+                case "regional":
+                    G(new[] { "heart" }, Hot, N(now, "heart"));
+                    G(new[] { "Superior lobe" }, Cool, N(now, "apex"));                       // the apex is the least perfused upright
+                    G(new[] { "Middle lobe", "Inferior lobe" }, Cool, N(now, "base"));
+                    G(new[] { "kidney" }, Warm, N(now, "kidney"));
+                    G(new[] { "Liver", "Spleen", "Stomach" }, Warm, N(now, "splanchnic"));
+                    G(new[] { "artery" }, Hot, N(now, "map"));
+                    break;
+                // special environments (torso pack): the same four channels mean different things per environment
+                case "special":
+                    {
+                        int env = Mathf.RoundToInt(P("env", 0));
+                        if (env != lastEnv) { norms.Clear(); lastEnv = env; }
+                        G(new[] { "heart" }, Hot, N(now, "hr"));
+                        switch (env)
+                        {
+                            case 0:   // altitude: a SaO2, b PaO2, c ventilation, d haemoglobin
+                                { float sa = Raw(now, "a"); G(new[] { "lung" }, Cool, float.IsNaN(sa) ? -1 : Mathf.Clamp01((100f - sa) / 35f) * 0.6f + Mathf.Max(0, N(now, "c")) * 0.4f); }
+                                G(new[] { "kidney" }, Warm, N(now, "d"));                    // EPO -> more haemoglobin
+                                G(new[] { "Spleen" }, Warm, N(now, "d") * 0.5f);
+                                break;
+                            case 1:   // diving: a pressure x10, b nitrogen x10, c bubbles, d narcosis
+                                G(new[] { "lung" }, Cool, N(now, "a"));                     // Boyle: the gas in the lungs is compressed with depth
+                                G(new[] { "vein" }, Hot, N(now, "c"));                      // bubbles return in the venous blood
+                                G(new[] { "Liver", "Spleen" }, Warm, N(now, "b") * 0.5f);  // tissues load with nitrogen
+                                break;
+                            case 2:   // acceleration: a pressure in the head, b at the heart, c retina, d in the feet /4
+                                G(new[] { "artery" }, Hot, N(now, "b"));
+                                G(new[] { "vein" }, Cool, N(now, "d"));                     // blood pools in the legs
+                                G(new[] { "lung" }, Cool, N(now, "c") * 0.5f);
+                                break;
+                            default:  // weightlessness: a fluid shift, b plasma, c lost muscle, d lost bone
+                                G(new[] { "vein" }, Cool, N(now, "a"));                     // fluid moves up to the chest
+                                G(new[] { "kidney" }, Warm, N(now, "d"));                   // calcium from the bones leaves in the urine
+                                G(new[] { "lung" }, Cool, N(now, "b") * 0.4f);
+                                break;
+                        }
+                        break;
+                    }
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }
