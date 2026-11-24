@@ -16,6 +16,7 @@ namespace MedAtlas.Sims
     public class SimApp : MonoBehaviour
     {
         public static string SelectedId = "blood-pressure";
+        public static string SelectedPreset;   // from a deep link (?preset= / #unity/<id>?preset=), applied once on load
         static readonly CultureInfo CI = CultureInfo.InvariantCulture;
 
         D def; int handle = -1; Dictionary<string, object> values;
@@ -71,6 +72,12 @@ namespace MedAtlas.Sims
             if (speeds.Count > 0) speedK = (float)MiniJson.D(MiniJson.O(speeds[0]), "k", 1);
             Build3D(MiniJson.S(def, "area"), SelectedId);
             BuildUI();
+            if (!string.IsNullOrEmpty(SelectedPreset))
+            {
+                bool known = MiniJson.L(def["presets"]).Exists(o => MiniJson.S(MiniJson.O(o), "id") == SelectedPreset);
+                if (known) ApplyPreset(SelectedPreset);
+                SelectedPreset = null;
+            }
             ready = true;
         }
 
