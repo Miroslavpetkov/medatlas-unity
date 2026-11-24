@@ -21,6 +21,10 @@ namespace MedAtlas.Heart
         bool? portrait;
         float distScale;
         public float LandscapeOffsetX = 0f;
+        /// <summary>Portrait is handled by a bottom sheet (Sims.PhoneSheet): only the header is scaled here, the panels are hidden.</summary>
+        public bool SheetMode;
+        public bool Portrait => portrait == true;
+        public float PortraitScale => distScale;
 
         public static ResponsiveLayout Attach(Transform canvas, OrbitCamera orbit, float portraitDistanceScale = 1.35f)
         {
@@ -89,11 +93,12 @@ namespace MedAtlas.Heart
             }
             scaler.referenceResolution = new Vector2(1080, 1920); scaler.matchWidthOrHeight = 0f;
             if (hint) hint.gameObject.SetActive(false);
-            tabsRoot.gameObject.SetActive(true);
+            tabsRoot.gameObject.SetActive(!SheetMode);
             if (orbit) { orbit.DistanceScale = distScale; orbit.ViewOffsetY = 0.13f; orbit.ViewOffsetX = 0f; }
             // phone: a bigger header (back button, system chip, title)
             const float HS = 1.7f;
             foreach (var h in header) { h.localScale = new Vector3(HS, HS, 1); h.anchoredPosition = saved[h].pos * HS; if (h.name == "Title") h.sizeDelta = new Vector2(1000 / HS, h.sizeDelta.y); }
+            if (SheetMode) return;   // the sheet lays out the panels and the control strip
 
             // control bar: wrap the buttons on rows of the screen width
             float x = 12, row = 0; const float BS = 1.2f, W = 1040 / BS, rowH = 56;
@@ -125,6 +130,7 @@ namespace MedAtlas.Heart
 
         void PortraitFrame()
         {
+            if (SheetMode) return;
             var canvasRt = (RectTransform)transform;
             float H = canvasRt.rect.height;
             float barTop = bar.anchoredPosition.y + bar.sizeDelta.y * bar.localScale.y;

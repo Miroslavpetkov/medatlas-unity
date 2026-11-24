@@ -1,5 +1,6 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
+import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
 // "Пътят през тялото" (the journeys) now live in the web list too (web #88–#93), so Unity uses them from there.
 // Journeys first, so they open the list as before.
 const PHYSIO: any[] = [...BASE.filter((m: any) => m.area === 'Journey'), ...BASE.filter((m: any) => m.area !== 'Journey')];
@@ -58,6 +59,8 @@ function def(m: any) {
     speeds: m.speeds, learn: (m.learn ?? []).map(bg),
     parts: (m.parts ?? []).map((p: any) => ({ id: p.id, name: bg(p.name), latin: p.latin ?? '', description: bg(p.description) ?? '', fn: bg(p.fn) ?? '' })),
     sampleDt: m.sampleDt ?? 0.004,
+    // the drug layer: a time course laid over sliders the model already has (web drugs.ts); Unity applies it the same way
+    drugs: drugsFor(m.id).map((d: any) => ({ id: d.id, label: bg(d.label), group: bg(d.group), how: bg(d.how), onset: d.onset, peak: d.peak, half: d.half, moves: d.moves })),
   };
 }
 

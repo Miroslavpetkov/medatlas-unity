@@ -171,6 +171,83 @@ namespace MedAtlas.Sims
             return b;
         }
 
+        // ---------------------------------------------------------------- hooks for the phone sheet (PhoneSheet)
+        public D Def => def;
+        public string PresetId => presetId;
+        public string PhaseTitle => phaseTitle != null ? phaseTitle.text : "";
+        public Color PhaseColor => phaseDot != null ? phaseDot.color : UIKit.Accent;
+        public readonly string[] KeyVal = { "—", "—", "—", "—" };
+        public readonly bool[] KeyBad = new bool[4];
+        public RectTransform GraphsPanel => C != null ? C.Find("Graphs") as RectTransform : null;
+        public RectTransform ParamsPanel => parPanel;
+        public RectTransform CardPanel => card;
+        public RectTransform BarPanel => C != null ? C.Find("Controls") as RectTransform : null;
+        public void Preset(string id) => ApplyPreset(id);
+        public void Act(string id) => PhysioBridge.Act(handle, id);
+        public string PresetLabel()
+        {
+            var p = MiniJson.O(MiniJson.L(def["presets"]).Find(o => MiniJson.S(MiniJson.O(o), "id") == presetId));
+            return p != null ? MiniJson.S(p, "label") : "Твои настройки";
+        }
+
+        // ---------------------------------------------------------------- drugs (same rule as the web drug layer)
+        // A drug is a time course laid over sliders the model already has: strength = rise (onset) x fall (half-life after the peak).
+        class Dose { public D drug; public float t0; }
+        readonly List<Dose> doses = new List<Dose>();
+        float modelTime, drugPush;
+        public string LastDrugHow = "";
+        public string DrugStatus()
+        {
+            if (doses.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (var d in doses) sb.Append(MiniJson.S(d.drug, "label")).Append("  ").Append(Mathf.RoundToInt(DrugStrength(d.drug, modelTime - d.t0) * 100)).Append(" %\n");
+            return sb.ToString().TrimEnd();
+        }
+        static float DrugStrength(D d, float dt)
+        {
+            if (dt <= 0) return 0;
+            float onset = Mathf.Max(0.05f, (float)MiniJson.D(d, "onset", 1)), peak = (float)MiniJson.D(d, "peak", 1), half = Mathf.Max(0.05f, (float)MiniJson.D(d, "half", 1));
+            float rise = 1 - Mathf.Exp(-dt / onset);
+            float fall = dt <= peak ? 1 : Mathf.Exp(-(dt - peak) * 0.6931472f / half);
+            return rise * fall;
+        }
+        public void GiveDrug(string id)
+        {
+            var d = MiniJson.O(MiniJson.L(def.ContainsKey("drugs") ? def["drugs"] : null).Find(o => MiniJson.S(MiniJson.O(o), "id") == id));
+            if (d == null) return;
+            doses.Add(new Dose { drug = d, t0 = modelTime }); LastDrugHow = MiniJson.S(d, "how"); drugPush = 0;
+        }
+        D WithDrugs()
+        {
+            var o = new D(values);
+            foreach (var dose in doses)
+            {
+                float k = DrugStrength(dose.drug, modelTime - dose.t0); if (k <= 0.001f) continue;
+                foreach (var mo in MiniJson.L(dose.drug["moves"]))
+                {
+                    var mv = MiniJson.O(mo); string id = MiniJson.S(mv, "id");
+                    double cur = o.TryGetValue(id, out var cv) ? MiniJson.Num(cv, 0) : 0;
+                    if (mv.ContainsKey("mul")) cur = cur * (1 + (MiniJson.Num(mv["mul"], 1) - 1) * k);
+                    if (mv.ContainsKey("add")) cur = cur + MiniJson.Num(mv["add"], 0) * k;
+                    o[id] = cur;
+                }
+            }
+            foreach (var so in MiniJson.L(def["sliders"]))
+            {
+                var sl = MiniJson.O(so); string id = MiniJson.S(sl, "id");
+                if (o.TryGetValue(id, out var v) && v is double dv) o[id] = (double)Mathf.Clamp((float)dv, (float)MiniJson.D(sl, "min"), (float)MiniJson.D(sl, "max"));
+            }
+            return o;
+        }
+        void TickDrugs(float modelDt, float dt)
+        {
+            modelTime += modelDt;
+            if (doses.Count == 0) return;
+            drugPush -= dt; if (drugPush > 0) return; drugPush = 0.2f;
+            doses.RemoveAll(d => modelTime - d.t0 > (float)MiniJson.D(d.drug, "peak", 1) && DrugStrength(d.drug, modelTime - d.t0) < 0.01f);
+            PhysioBridge.Set(handle, MiniJson.Write(doses.Count > 0 ? WithDrugs() : values));
+        }
+
         public static MicroScene.Kind? MicroFor(string id)
         {
             switch (id)
@@ -364,6 +441,9 @@ namespace MedAtlas.Sims
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
             // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
             picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
+            // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
+            layout.SheetMode = true;
+            PhoneSheet.Attach(this, C, layout, orbit);
             LayoutCard();
         }
 
@@ -588,6 +668,7 @@ namespace MedAtlas.Sims
             if (!ready) return;
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             float modelDt = paused ? 0 : dt * speedK;
+            TickDrugs(modelDt, dt);
             int maxSamples = 200;
             var res = MiniJson.O(MiniJson.Parse(PhysioBridge.Step(handle, modelDt, maxSamples)));
             if (res == null) return;
@@ -657,7 +738,7 @@ namespace MedAtlas.Sims
 
             // stats
             var stv = MiniJson.O(res["stats"]);
-            var sb = new System.Text.StringBuilder();
+            var sb = new System.Text.StringBuilder(); int keyIdx = 0;
             foreach (var o in MiniJson.L(def["stats"]))
             {
                 var s = MiniJson.O(o); string id = MiniJson.S(s, "id"); int dp = (int)MiniJson.D(s, "dp", 0); string unit = MiniJson.S(s, "unit");
@@ -671,6 +752,7 @@ namespace MedAtlas.Sims
                 }
                 else txt = v == null ? "—" : v.ToString();
                 if (unit != "" && v is double) txt += " " + unit;
+                if (keyIdx < 4) { KeyVal[keyIdx] = txt; KeyBad[keyIdx] = bad; } keyIdx++;
                 sb.Append(bad ? "<color=#FFB347>" + txt + "</color>" : txt).Append('\n');
             }
             statsValues.text = sb.ToString();
