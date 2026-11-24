@@ -124,6 +124,7 @@ namespace MedAtlas.Sims
                 case "male": case "ans": return 7.6f;   // tall packs
                 case "torso": case "eye": case "ear": return 7.0f;
                 case "leg": case "senses_head": return 6.6f;
+                case "abdomen": return 6.8f;   // the liver must stay below the info card
                 default: return 5.6f;
             }
         }
@@ -142,11 +143,11 @@ namespace MedAtlas.Sims
             {
                 case MicroScene.Kind.Synapse: return 14f;
                 case MicroScene.Kind.Sarcomere: return 15f;
-                case MicroScene.Kind.Nephron: return 13f;
-                case MicroScene.Kind.Skin: return 12f;
+                case MicroScene.Kind.Nephron: return 15.5f;
+                case MicroScene.Kind.Skin: return 17f;
                 case MicroScene.Kind.Smooth: return 11.5f;
                 case MicroScene.Kind.Membrane: return 10f;
-                case MicroScene.Kind.Vessel: return 9.6f;
+                case MicroScene.Kind.Vessel: return 13.5f;
                 default: return 9.2f;   // axon
             }
         }
@@ -195,7 +196,7 @@ namespace MedAtlas.Sims
                     float wide = Mathf.Max(mb.extents.x, mb.extents.z) / (Mathf.Tan(15f * Mathf.Deg2Rad) * aspect * 0.6f);
                     orbit.Target = mb.center; orbit.Distance = Mathf.Clamp(Mathf.Max(Mathf.Max(mb.extents.magnitude * 3.1f, wide), MicroDistance(mk.Value)), 6f, 26f);   // particles (filaments, cells) are not in the bounds: keep a floor per kind
                 }
-                viewShiftX = 0.11f;   // cell scenes are wide: keep them left of the chart column
+                viewShiftX = mk.Value == MicroScene.Kind.Skin ? 0.08f : 0.11f;   // cell scenes are wide: keep them left of the chart column
                 return;
             }
             if (id == "human" || id == "exercise") area = "Heart";
@@ -216,7 +217,7 @@ namespace MedAtlas.Sims
                         StartCoroutine(ModelFiles.Load("organ_body_paths.json", pj => { if (pj == null) return; journey = root.AddComponent<JourneyView>(); journey.Init(organ, System.Text.Encoding.UTF8.GetString(pj)); journey.Opacity = opacity; }));
                     }
                 }));
-                orbit.Distance = journeyPack ? 6.4f : PackDistance(pack); orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = pack == "ear" ? new Vector3(0.75f, 0, 0) : Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;   // ear: eardrum and ossicles sit at +x, keep them clear of the charts
+                orbit.Distance = journeyPack ? 6.4f : PackDistance(pack); orbit.MinDistance = 1.2f; orbit.MaxDistance = 16f; orbit.Target = pack == "ear" ? new Vector3(0.75f, 0, 0) : pack == "abdomen" ? new Vector3(0, 0.45f, 0) : Vector3.zero; orbit.Yaw = pack == "brain" ? -30f : -10f;   // ear: eardrum and ossicles sit at +x, keep them clear of the charts
                 return;
             }
             if (area == "Heart" || area == "Circulation")
