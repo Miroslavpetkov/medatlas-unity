@@ -45,13 +45,9 @@ namespace MedAtlas.Sims
             if (!deepLinked)
             {
                 deepLinked = true;
-                string url = Application.absoluteURL ?? ""; int k = url.IndexOf("sim=");
-                if (k >= 0)
-                {
-                    string id = url.Substring(k + 4); int e = id.IndexOfAny(new[] { '&', '#' }); if (e >= 0) id = id.Substring(0, e);
-                    id = UnityEngine.Networking.UnityWebRequest.UnEscapeURL(id);
-                    if (id.Length > 0) { Open(id); return; }
-                }
+                // ?sim=<id>[&preset=<p>]  or the web's hash form  #unity/<id>?preset=<p>  /  #phys/<id>?preset=<p>
+                var (id, preset) = ParseDeepLink(Application.absoluteURL ?? "");
+                if (!string.IsNullOrEmpty(id)) { SimApp.SelectedPreset = preset; Open(id); return; }
             }
             var camGo = new GameObject("Main Camera"); var cam = camGo.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor; cam.backgroundColor = UIKit.Bg;
@@ -165,6 +161,28 @@ namespace MedAtlas.Sims
         {
             r.anchorMin = new Vector2(0, 1); r.anchorMax = new Vector2(1, 1); r.pivot = new Vector2(0, 1);
             r.offsetMin = new Vector2(left, top - h); r.offsetMax = new Vector2(-right, top);
+        }
+
+        public static (string id, string preset) ParseDeepLink(string url)
+        {
+            string Val(string from, string key)
+            {
+                int k = from.IndexOf(key); if (k < 0) return null;
+                string v = from.Substring(k + key.Length); int e = v.IndexOfAny(new[] { '&', '#', '?', '/' }); if (e >= 0) v = v.Substring(0, e);
+                return UnityEngine.Networking.UnityWebRequest.UnEscapeURL(v);
+            }
+            string id = null, preset = null;
+            int h = url.IndexOf('#');
+            if (h >= 0)
+            {
+                string hash = url.Substring(h + 1);
+                foreach (var pre in new[] { "unity/", "phys/" })
+                    if (hash.StartsWith(pre)) { id = hash.Substring(pre.Length); int e = id.IndexOfAny(new[] { '?', '&', '/' }); if (e >= 0) id = id.Substring(0, e); break; }
+                if (id != null) preset = Val(hash, "preset=");
+            }
+            if (string.IsNullOrEmpty(id)) { string q = h >= 0 ? url.Substring(0, h) : url; id = Val(q, "sim="); preset = Val(q, "preset="); }
+            if (id != null) id = UnityEngine.Networking.UnityWebRequest.UnEscapeURL(id);
+            return (id, preset);
         }
 
         static void Open(string id)

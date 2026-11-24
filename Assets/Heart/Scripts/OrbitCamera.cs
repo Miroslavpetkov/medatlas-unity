@@ -39,7 +39,8 @@ namespace MedAtlas.Heart
             var data = new PointerEventData(es) { position = screen };
             var results = new System.Collections.Generic.List<RaycastResult>();
             es.RaycastAll(data, results);
-            return results.Count > 0;
+            // only UI counts: 3D parts are ray-cast too (tap-for-info), and the orbit must still work over them
+            return results.Exists(r => r.module is UnityEngine.UI.GraphicRaycaster);
         }
 
         void Update()
