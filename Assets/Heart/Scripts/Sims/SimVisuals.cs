@@ -73,6 +73,10 @@ namespace MedAtlas.Sims
                 case "blood": G(new[] { "kidney" }, Warm, N(now, "epo")); G(new[] { "Liver" }, Cool, N(now, "fer")); G(new[] { "Spleen" }, Hot, N(now, "ret")); break;
                 // leg veins and the calf muscle pump (organ_leg pack)
                 case "venous-return": G(new[] { "vein" }, Cool, N(now, "pool")); G(new[] { "gastrocnemius", "Soleus" }, Warm, N(now, "co")); break;
+                case "liver": G(new[] { "Liver" }, Warm, N(now, "glycogen")); G(new[] { "Pancreas" }, Cool, N(now, "glucose")); break;
+                case "enteric": G(new[] { "Stomach" }, Warm, N(now, "stomach")); G(new[] { "Duodenum", "Jejunum" }, Warm, N(now, "small")); G(new[] { "colon", "appendix" }, Cool, N(now, "distal")); G(new[] { "artery" }, Hot, N(now, "flow")); break;
+                case "growth-prolactin": G(new[] { "Adenohypophysis" }, Warm, Mathf.Max(N(now, "gh"), N(now, "prl"))); G(new[] { "cortex" }, Cool, N(now, "sleep") * 0.5f); break;
+                case "feedback": G(new[] { "artery" }, Hot, N(now, "val")); G(new[] { "heart" }, Warm, N(now, "u")); break;
                 case "thyroid": G(new[] { "Thyroid gland" }, Warm, N(now, "ft4")); break;
                 case "calcium": G(new[] { "parathyroid" }, Warm, N(now, "pth")); G(new[] { "Thyroid gland" }, Cool, 0.15f); break;
             }

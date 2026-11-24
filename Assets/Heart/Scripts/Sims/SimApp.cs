@@ -102,6 +102,9 @@ namespace MedAtlas.Sims
                 case "hearing": case "vestibular": return "ear";
                 case "chemo": return "senses_head";                     // tongue, nasal mucosa, olfactory nerves
                 case "ans": return "ans";                               // spinal cord, sympathetic trunks, vagus and target organs
+                case "liver": case "enteric": return "abdomen";
+                case "growth-prolactin": return "brain";                // the pituitary
+                case "feedback": return "torso";
                 case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
@@ -136,9 +139,15 @@ namespace MedAtlas.Sims
         {
             switch (id)
             {
-                case "membrane": case "cardiac-ap": case "synapse-receptors": case "neuron-glia": case "signal": return MicroScene.Kind.Membrane;
-                case "action-potential": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups": case "skin": return MicroScene.Kind.Vessel;
+                case "membrane": case "cardiac-ap": case "signal": case "vesicles": case "potassium": return MicroScene.Kind.Membrane;
+                case "action-potential": case "electrotonic": case "nerve-fibres": return MicroScene.Kind.Axon;
+                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups":
+                case "leukocytes": case "haemopoiesis": case "plasma": case "lipids": case "lymph": return MicroScene.Kind.Vessel;
+                case "synapse-receptors": case "neuron-glia": return MicroScene.Kind.Synapse;
+                case "muscle": return MicroScene.Kind.Sarcomere;
+                case "smooth": return MicroScene.Kind.Smooth;
+                case "kidney-filtration": case "epithelium": case "clearance": return MicroScene.Kind.Nephron;
+                case "skin": case "touch": return MicroScene.Kind.Skin;
             }
             return null;
         }
