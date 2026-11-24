@@ -35,7 +35,7 @@ namespace MedAtlas.Sims
         readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
         const int N = 400;
         float sampleDt = 0.004f; float curveTimer;
-        float statsH; float opacity = 1f; bool journeyPack; string packName;
+        float statsH; float opacity = 1f; bool journeyPack; string packName; float viewShiftX;
         void ApplyOpacity(float o)
         {
             opacity = o;
@@ -102,6 +102,9 @@ namespace MedAtlas.Sims
                 case "hearing": case "vestibular": return "ear";
                 case "chemo": return "senses_head";                     // tongue, nasal mucosa, olfactory nerves
                 case "ans": return "ans";                               // spinal cord, sympathetic trunks, vagus and target organs
+                case "liver": case "enteric": return "abdomen";
+                case "growth-prolactin": return "brain";                // the pituitary
+                case "feedback": return "torso";
                 case "special": case "skin": return null;
             }
             if (area == "Nerve") return "brain";
@@ -132,13 +135,46 @@ namespace MedAtlas.Sims
             switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }
         }
 
+        /// <summary>Camera distance per cell scene, so the whole scene sits between the info card and the charts.</summary>
+        static float MicroDistance(MicroScene.Kind k)
+        {
+            switch (k)
+            {
+                case MicroScene.Kind.Synapse: return 14f;
+                case MicroScene.Kind.Sarcomere: return 15f;
+                case MicroScene.Kind.Nephron: return 13f;
+                case MicroScene.Kind.Skin: return 12f;
+                case MicroScene.Kind.Smooth: return 11.5f;
+                case MicroScene.Kind.Membrane: return 10f;
+                case MicroScene.Kind.Vessel: return 9.6f;
+                default: return 9.2f;   // axon
+            }
+        }
+
+        static Bounds MeshBounds(Transform root)
+        {
+            var b = new Bounds(); bool any = false;
+            foreach (var r in root.GetComponentsInChildren<Renderer>())
+            {
+                if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;   // particles move; frame the fixed structures
+                if (!any) { b = r.bounds; any = true; } else b.Encapsulate(r.bounds);
+            }
+            return b;
+        }
+
         public static MicroScene.Kind? MicroFor(string id)
         {
             switch (id)
             {
-                case "membrane": case "cardiac-ap": case "synapse-receptors": case "neuron-glia": case "signal": return MicroScene.Kind.Membrane;
-                case "action-potential": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups": case "skin": return MicroScene.Kind.Vessel;
+                case "membrane": case "cardiac-ap": case "signal": case "vesicles": case "potassium": return MicroScene.Kind.Membrane;
+                case "action-potential": case "electrotonic": case "nerve-fibres": return MicroScene.Kind.Axon;
+                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups":
+                case "leukocytes": case "haemopoiesis": case "plasma": case "lipids": case "lymph": return MicroScene.Kind.Vessel;
+                case "synapse-receptors": case "neuron-glia": return MicroScene.Kind.Synapse;
+                case "muscle": return MicroScene.Kind.Sarcomere;
+                case "smooth": return MicroScene.Kind.Smooth;
+                case "kidney-filtration": case "epithelium": case "clearance": return MicroScene.Kind.Nephron;
+                case "skin": case "touch": return MicroScene.Kind.Skin;
             }
             return null;
         }
@@ -149,7 +185,17 @@ namespace MedAtlas.Sims
             if (mk != null)
             {
                 var mroot = new GameObject("Micro"); micro = mroot.AddComponent<MicroScene>(); micro.Build(mk.Value, id);
-                orbit.Distance = 8.6f; orbit.MinDistance = 2f; orbit.MaxDistance = 16f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
+                orbit.Distance = MicroDistance(mk.Value); orbit.MinDistance = 2f; orbit.MaxDistance = 26f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
+                // frame what was actually built: aim at the middle of the meshes and back off so all of it fits (30 deg FOV)
+                var mb = MeshBounds(mroot.transform);
+                if (mb.size.sqrMagnitude > 0.01f)
+                {
+                    // fit the height (bounding radius) and the width into the ~60 % of the screen left free by the panels
+                    float aspect = Mathf.Max(0.5f, cam != null ? cam.aspect : 1.6f);
+                    float wide = Mathf.Max(mb.extents.x, mb.extents.z) / (Mathf.Tan(15f * Mathf.Deg2Rad) * aspect * 0.6f);
+                    orbit.Target = mb.center; orbit.Distance = Mathf.Clamp(Mathf.Max(Mathf.Max(mb.extents.magnitude * 3.1f, wide), MicroDistance(mk.Value)), 6f, 26f);   // particles (filaments, cells) are not in the bounds: keep a floor per kind
+                }
+                viewShiftX = 0.11f;   // cell scenes are wide: keep them left of the chart column
                 return;
             }
             if (id == "human" || id == "exercise") area = "Heart";
@@ -307,7 +353,7 @@ namespace MedAtlas.Sims
             var credit = UIKit.Label(C, creditText, 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
             layout = ResponsiveLayout.Attach(C, orbit, 1.75f);
-            layout.LandscapeOffsetX = 0.03f;
+            layout.LandscapeOffsetX = 0.03f + viewShiftX;
             LayoutCard();
         }
 
@@ -386,7 +432,7 @@ namespace MedAtlas.Sims
             {
                 var t = C.Find(n); if (t != null) t.gameObject.SetActive(!focus);
             }
-            orbit.ViewOffsetX = focus ? 0f : 0.03f;
+            orbit.ViewOffsetX = focus ? 0f : 0.03f + viewShiftX;
             orbit.DistanceScale = focus ? 0.8f : 1f;
         }
 
