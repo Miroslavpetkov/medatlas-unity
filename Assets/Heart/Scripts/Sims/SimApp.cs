@@ -105,7 +105,8 @@ namespace MedAtlas.Sims
                 case "liver": case "enteric": return "abdomen";
                 case "growth-prolactin": return "brain";                // the pituitary
                 case "feedback": return "torso";
-                case "special": case "skin": return null;
+                case "regional": case "special": return "torso";   // regional blood flow; altitude, diving, acceleration, weightlessness
+                case "skin": return null;
             }
             if (area == "Nerve") return "brain";
             if (area == "Kidney") return "kidney";
@@ -133,7 +134,7 @@ namespace MedAtlas.Sims
         static float StartOpacity(string id, string pack)
         {
             if (IsJourney(id)) return 35;
-            switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }
+            switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }   // special and regional use the torso at 60 %
         }
 
         /// <summary>Camera distance per cell scene, so the whole scene sits between the info card and the charts.</summary>
@@ -200,12 +201,11 @@ namespace MedAtlas.Sims
                 return;
             }
             if (id == "human" || id == "exercise") area = "Heart";
-            if (id == "special") area = "Lungs";
             var pack = PackFor(area, id);
             if (pack != null)
             {
                 journeyPack = IsJourney(id); packName = pack;
-                var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ);
+                var root = new GameObject("Organ"); organ = root.AddComponent<OrganView>(); visuals = new SimVisuals(id, organ) { Params = () => values };
                 StartCoroutine(ModelFiles.Load("organ_" + pack + ".wasm", d =>
                 {
                     organ.Build(d); root.transform.position = -organ.Bounds.center;

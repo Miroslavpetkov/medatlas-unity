@@ -85,7 +85,11 @@ namespace MedAtlas.Sims
             {
                 bool hit = false;
                 foreach (var k in keys) if (p.Name.IndexOf(k, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == k) { hit = true; break; }
-                if (hit) p.Mat.SetColor("_EmissionColor", color * Mathf.Clamp01(intensity) * 3.2f);
+                if (!hit) continue;
+                float amt = Mathf.Clamp01(intensity);
+                p.Mat.SetColor("_EmissionColor", color * amt * 1.0f);   // emission renders in the build now (kept by HighlightEmission.mat): keep it a tint, not a blow-out
+                // in glass mode (opacity < 100) the part is drawn with its X-ray material, which has no emission: tint it instead
+                if (p.Glass != null) p.Glass.SetColor("_Color", Color.Lerp(GlassBase(p), color * 1.3f, amt * 0.8f));
             }
         }
 
@@ -93,7 +97,12 @@ namespace MedAtlas.Sims
         {
             foreach (var p in Parts)
                 foreach (var key in keys)
-                    if (p.Name.IndexOf(key, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == key) { p.Mat.SetColor("_BaseColor", Color.Lerp(p.Base, target, Mathf.Clamp01(k))); break; }
+                    if (p.Name.IndexOf(key, System.StringComparison.OrdinalIgnoreCase) >= 0 || p.Cls == key)
+                    {
+                        p.Mat.SetColor("_BaseColor", Color.Lerp(p.Base, target, Mathf.Clamp01(k)));
+                        if (p.Glass != null) p.Glass.SetColor("_Color", Color.Lerp(GlassBase(p), target, Mathf.Clamp01(k)));
+                        break;
+                    }
         }
 
         // ---- flow of droplets along tube-like parts (urine in the ureters)
@@ -195,6 +204,8 @@ namespace MedAtlas.Sims
         }
 
         /// <summary>Opacity 0.01–1 (slider 1–100): 1 = solid organs, lower = X-ray glass.</summary>
+        static Color GlassBase(Part p) => Color.Lerp(p.Base, Color.white, 0.25f);
+
         public void SetOpacity(float o)
         {
             o = Mathf.Clamp(o, 0.01f, 1f);
@@ -203,7 +214,7 @@ namespace MedAtlas.Sims
                 var r = ch.GetComponent<Renderer>(); var p = Parts.Find(x => x.Name == ch.name);
                 if (r == null || p == null) continue;
                 if (o >= 0.995f) { r.sharedMaterial = p.Mat; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; continue; }
-                if (p.Glass == null) p.Glass = MedAtlas.Heart.Opacity.Glass(Color.Lerp(p.Base, Color.white, 0.25f));
+                if (p.Glass == null) p.Glass = MedAtlas.Heart.Opacity.Glass(GlassBase(p));
                 MedAtlas.Heart.Opacity.Apply(p.Glass, o);
                 r.sharedMaterial = p.Glass; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
