@@ -360,7 +360,7 @@ namespace MedAtlas.Sims
             if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
             var credit = UIKit.Label(C, creditText, 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
-            layout = ResponsiveLayout.Attach(C, orbit, 1.75f);
+            layout = ResponsiveLayout.Attach(C, orbit, packName == "brain" ? 2.5f : packName == "uterus" || packName == "male" ? 2.2f : 1.75f);   // wide packs need more room on a tall phone screen
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
             // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
             picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
