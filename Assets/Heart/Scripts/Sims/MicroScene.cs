@@ -363,7 +363,7 @@ namespace MedAtlas.Sims
         void BuildVessel()
         {
             var wall = Glass(new Color(1f, 0.45f, 0.42f, 1f));
-            RodX(Vector3.zero, 5.6f, 0.65f, wall);
+            RodX(Vector3.zero, 4f, 0.65f, wall);
             rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
             if (id == "haemostasis")
                 clot = Prim(PrimitiveType.Sphere, new Vector3(0, 0.62f, 0), Vector3.zero, Lit(new Color(0.55f, 0.05f, 0.08f), 0.4f)).transform;
@@ -374,13 +374,13 @@ namespace MedAtlas.Sims
             if (id == "leukocytes")
             {
                 // the infected tissue above the vessel
-                Prim(PrimitiveType.Sphere, new Vector3(0.6f, 1.75f, 0), new Vector3(1.8f, 0.8f, 1.2f), Glass(new Color(0.6f, 0.9f, 0.5f), 0.04f, 0.35f));
+                Prim(PrimitiveType.Sphere, new Vector3(0.3f, 1.7f, 0), new Vector3(1.6f, 0.75f, 1.1f), Glass(new Color(0.6f, 0.9f, 0.5f), 0.04f, 0.35f));
             }
             if (id == "capillary" || id == "lymph")
             {
                 // tissue around and a blind-ended lymph capillary below
-                Prim(PrimitiveType.Cube, new Vector3(0, -0.2f, 0), new Vector3(5.4f, 3.2f, 2.2f), Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f));
-                RodX(new Vector3(0, -1.35f, 0), 5.0f, 0.32f, Glass(new Color(0.8f, 0.95f, 0.6f), 0.08f, 0.6f));
+                Prim(PrimitiveType.Cube, new Vector3(0, -0.2f, 0), new Vector3(3.9f, 3.2f, 2.2f), Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f));
+                RodX(new Vector3(0, -1.35f, 0), 3.6f, 0.32f, Glass(new Color(0.8f, 0.95f, 0.6f), 0.08f, 0.6f));
             }
         }
 
@@ -405,12 +405,12 @@ namespace MedAtlas.Sims
             for (int i = Due(ref accRbc, 22f * density * speed, dt); i > 0; i--)
             {
                 var r = Random.insideUnitCircle * 0.5f;
-                Spawn(rbcs, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.18f, 5.5f / speed, Random.Range(0, 1000));
+                Spawn(rbcs, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.18f, 3.9f / speed, Random.Range(0, 1000));
             }
             if (id == "capillary")
             {
                 float f = N(now, "filt");
-                for (int i = Due(ref accLeak, 1 + Mathf.Max(0, f) * 25f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.8f, 1.8f), 0.62f, Random.Range(-0.3f, 0.3f)), new Vector3(0, 0.5f, 0), new Color(0.6f, 0.85f, 1f, 0.85f), 0.07f, 1.5f);
+                for (int i = Due(ref accLeak, 1 + Mathf.Max(0, f) * 25f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.4f, 1.4f), 0.62f, Random.Range(-0.3f, 0.3f)), new Vector3(0, 0.5f, 0), new Color(0.6f, 0.85f, 1f, 0.85f), 0.07f, 1.5f);
             }
             if (id == "capillary" || id == "lymph")
             {
@@ -419,9 +419,9 @@ namespace MedAtlas.Sims
                 for (int i = Due(ref accLymph, 3f + lf * 40f, dt); i > 0; i--)
                 {
                     var r = Random.insideUnitCircle * 0.22f;
-                    Spawn(dots, new Vector3(-2.4f, -1.35f + r.x, r.y), new Vector3(0.5f + lf * 2.2f, 0, 0), new Color(0.85f, 1f, 0.6f, 0.9f), 0.09f, 4.8f / (0.5f + lf * 2.2f));
+                    Spawn(dots, new Vector3(-1.75f, -1.35f + r.x, r.y), new Vector3(0.5f + lf * 2.2f, 0, 0), new Color(0.85f, 1f, 0.6f, 0.9f), 0.09f, 3.5f / (0.5f + lf * 2.2f));
                 }
-                for (int i = Due(ref accLeak, 2f + lf * 12f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.8f, 1.8f), -0.62f, Random.Range(-0.3f, 0.3f)), new Vector3(0, -0.5f, 0), new Color(0.6f, 0.85f, 1f, 0.85f), 0.07f, 0.9f);
+                for (int i = Due(ref accLeak, 2f + lf * 12f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.4f, 1.4f), -0.62f, Random.Range(-0.3f, 0.3f)), new Vector3(0, -0.5f, 0), new Color(0.6f, 0.85f, 1f, 0.85f), 0.07f, 0.9f);
             }
             if (id == "leukocytes")
             {
@@ -431,30 +431,30 @@ namespace MedAtlas.Sims
                     var r = Random.insideUnitCircle * 0.45f;
                     // with an infection some neutrophils leave the vessel (diapedesis) towards the bacteria
                     bool out_ = bact > 0.02f && Random.value < 0.25f + bact * 0.5f;
-                    Spawn(wbcs, new Vector3(out_ ? Random.Range(-0.6f, 1.6f) : -2.75f, out_ ? 0.6f : r.x, r.y), out_ ? new Vector3(Random.Range(-0.2f, 0.2f), 0.45f, 0) : new Vector3(speed * 0.8f, 0, 0), Color.white, 0.3f, out_ ? 2.4f : 5.5f / speed, 0);
+                    Spawn(wbcs, new Vector3(out_ ? Random.Range(-0.5f, 1.1f) : -1.95f, out_ ? 0.6f : r.x, r.y), out_ ? new Vector3(Random.Range(-0.2f, 0.2f), 0.45f, 0) : new Vector3(speed * 0.8f, 0, 0), Color.white, 0.3f, out_ ? 2.4f : 3.9f / speed, 0);
                 }
                 for (int i = Due(ref accBact, bact * 30f, dt); i > 0; i--)
-                    Spawn(dots, new Vector3(0.6f, 1.75f, 0) + Vector3.Scale(Random.insideUnitSphere, new Vector3(0.8f, 0.3f, 0.5f)), Random.insideUnitSphere * 0.08f, new Color(0.45f, 0.95f, 0.3f, 0.95f), 0.1f, 2f);
+                    Spawn(dots, new Vector3(0.3f, 1.7f, 0) + Vector3.Scale(Random.insideUnitSphere, new Vector3(0.7f, 0.28f, 0.45f)), Random.insideUnitSphere * 0.08f, new Color(0.45f, 0.95f, 0.3f, 0.95f), 0.1f, 2f);
             }
             if (id == "haemopoiesis")
             {
                 float neut = F(now, "neut", 0, 180, 0.55f), plt = F(now, "plt", 0, 110, 0.9f);
-                for (int i = Due(ref accWbc, 1f + neut * 6f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.45f; Spawn(wbcs, new Vector3(-2.75f, r.x, r.y), new Vector3(speed * 0.8f, 0, 0), Color.white, 0.3f, 5.5f / speed); }
-                for (int i = Due(ref accPlt, plt * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.5f; Spawn(dots, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), new Color(0.85f, 0.6f, 1f, 0.95f), 0.07f, 5.5f / speed); }
+                for (int i = Due(ref accWbc, 1f + neut * 6f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.45f; Spawn(wbcs, new Vector3(-1.95f, r.x, r.y), new Vector3(speed * 0.8f, 0, 0), Color.white, 0.3f, 3.9f / speed); }
+                for (int i = Due(ref accPlt, plt * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.5f; Spawn(dots, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), new Color(0.85f, 0.6f, 1f, 0.95f), 0.07f, 3.9f / speed); }
             }
             if (id == "plasma")
             {
                 float alb = F(now, "alb", 10, 55, 0.6f);
-                for (int i = Due(ref accProt, alb * 60f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), new Color(1f, 0.95f, 0.5f, 0.85f), 0.05f, 5.5f / speed); }
+                for (int i = Due(ref accProt, alb * 60f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), new Color(1f, 0.95f, 0.5f, 0.85f), 0.05f, 3.9f / speed); }
             }
             if (id == "lipids")
             {
                 // chylomicrons (large), VLDL (medium), free fatty acids and ketone bodies (dots)
                 float chylo = F(now, "chylo", 0, 0.4f), vldl = F(now, "vldl", 0, 10, 0.1f), ffa = F(now, "ffa", 0, 2.6f, 0.2f), ket = F(now, "ket", 0, 14);
-                for (int i = Due(ref accLipo, chylo * 8f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.4f; Spawn(lipo, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.42f, 5.5f / speed); }
-                for (int i = Due(ref accWbc, 2f + vldl * 25f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.45f; Spawn(lipo, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.18f, 5.5f / speed); }
-                for (int i = Due(ref accProt, ffa * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), new Color(1f, 0.95f, 0.6f, 0.9f), 0.06f, 5.5f / speed); }
-                for (int i = Due(ref accPlt, ket * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-2.75f, r.x, r.y), new Vector3(speed, 0, 0), new Color(0.6f, 1f, 0.6f, 0.9f), 0.06f, 5.5f / speed); }
+                for (int i = Due(ref accLipo, chylo * 8f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.4f; Spawn(lipo, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.42f, 3.9f / speed); }
+                for (int i = Due(ref accWbc, 2f + vldl * 25f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.45f; Spawn(lipo, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), Color.white, 0.18f, 3.9f / speed); }
+                for (int i = Due(ref accProt, ffa * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), new Color(1f, 0.95f, 0.6f, 0.9f), 0.06f, 3.9f / speed); }
+                for (int i = Due(ref accPlt, ket * 40f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.55f; Spawn(dots, new Vector3(-1.95f, r.x, r.y), new Vector3(speed, 0, 0), new Color(0.6f, 1f, 0.6f, 0.9f), 0.06f, 3.9f / speed); }
             }
             if (clot != null)
             {
@@ -659,6 +659,7 @@ namespace MedAtlas.Sims
         Material cellsMat, tuftMat, capMat;
         void BuildNephron()
         {
+            if (id == "epithelium") { BuildEpithelium(); return; }
             // Bowman's capsule with the glomerular tuft, afferent and efferent arterioles
             Prim(PrimitiveType.Sphere, new Vector3(-2.4f, 0, 0), Vector3.one * 1.7f, Glass(new Color(0.6f, 0.8f, 1f), 0.05f, 0.45f));
             tuftMat = Lit(new Color(0.8f, 0.15f, 0.15f), 0.6f);
@@ -667,21 +668,22 @@ namespace MedAtlas.Sims
             Rod(new Vector3(-2.55f, 0.4f, 0.1f), new Vector3(-2.9f, 2.0f, 0.1f), 0.12f, art);
             Rod(new Vector3(-2.25f, 0.4f, -0.1f), new Vector3(-1.8f, 1.6f, -0.1f), 0.09f, art);
             // the tubule leaving the capsule, its epithelium and the peritubular capillary above it
-            RodX(new Vector3(0.7f, 0, 0), 4.2f, 0.5f, Glass(new Color(1f, 0.9f, 0.55f), 0.06f, 0.5f));
+            RodX(new Vector3(0.35f, 0, 0), 3.5f, 0.5f, Glass(new Color(1f, 0.9f, 0.55f), 0.06f, 0.5f));
             cellsMat = Lit(new Color(0.85f, 0.7f, 0.6f), 0.5f);
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 8; i++)
             {
                 Prim(PrimitiveType.Cube, new Vector3(-1.05f + i * 0.42f, 0.62f, 0), new Vector3(0.38f, 0.3f, 0.7f), cellsMat);
                 Prim(PrimitiveType.Cube, new Vector3(-1.05f + i * 0.42f, -0.62f, 0), new Vector3(0.38f, 0.3f, 0.7f), cellsMat);
             }
             capMat = Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f);
-            RodX(new Vector3(0.9f, 1.3f, 0), 4.0f, 0.3f, capMat);
+            RodX(new Vector3(0.45f, 1.3f, 0), 3.4f, 0.3f, capMat);
             rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
         }
 
         float accF, accR, accS, accU, accRbcN, accPara, accW;
         void TickNephron(Dictionary<string, object> now, float dt)
         {
+            if (id == "epithelium") { TickEpithelium(now, dt); return; }
             float filt, reab, sec = 0, urine, cellNa = 0.4f, flow = 0.6f;
             Color fCol = new Color(0.6f, 0.85f, 1f, 0.9f), rCol = new Color(0.6f, 0.85f, 1f, 0.9f);
             switch (id)
@@ -691,7 +693,7 @@ namespace MedAtlas.Sims
                         // glucose (green): filtered, taken back by SGLT up to Tm, the rest in the urine; PAH (violet) secreted from the capillary
                         float gF = Raw(now, "gF"), gR = Raw(now, "gR"), gE = Raw(now, "gE");
                         filt = float.IsNaN(gF) ? 0.3f : Mathf.Clamp01(gF / 3.8f); reab = float.IsNaN(gR) ? 0.3f : Mathf.Clamp01(gR / 3.8f);
-                        urine = float.IsNaN(gE) ? 0 : Mathf.Clamp01(gE / 3.8f); sec = F(now, "cPah", 150, 800, 0.5f);
+                        urine = float.IsNaN(gE) ? 0 : Mathf.Sqrt(Mathf.Clamp01(gE / 3.8f));   // sqrt: the first glucose in the urine (splay) is already visible sec = F(now, "cPah", 150, 800, 0.5f);
                         fCol = rCol = new Color(0.45f, 1f, 0.45f, 0.95f); break;
                     }
                 case "epithelium":
@@ -707,10 +709,10 @@ namespace MedAtlas.Sims
             for (int i = Due(ref accF, 3f + filt * 45f, dt); i > 0; i--)
             {
                 if (Random.value < 0.4f) Spawn(dots, new Vector3(-2.4f, 0.05f, 0) + Random.insideUnitSphere * 0.4f, Random.onUnitSphere * 0.5f, fCol, 0.08f, 0.6f);
-                else { var r = Random.insideUnitCircle * 0.32f; Spawn(dots, new Vector3(-1.4f, r.x, r.y), new Vector3(1.3f, 0, 0), fCol, 0.08f, Random.Range(1.0f, 3.2f)); }
+                else { var r = Random.insideUnitCircle * 0.32f; Spawn(dots, new Vector3(-1.4f, r.x, r.y), new Vector3(1.3f, 0, 0), fCol, 0.08f, Random.Range(1.0f, 2.6f)); }
             }
             // reabsorption: through the cells up into the capillary
-            for (int i = Due(ref accR, reab * 45f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.1f, 2.4f), 0.35f, Random.Range(-0.2f, 0.2f)), new Vector3(0, 0.9f, 0), rCol, 0.08f, 1.0f);
+            for (int i = Due(ref accR, reab * 45f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.1f, 1.9f), 0.35f, Random.Range(-0.2f, 0.2f)), new Vector3(0, 0.9f, 0), rCol, 0.08f, 1.0f);
             if (id == "epithelium")
             {
                 // paracellular route between the cells and water following the salt
@@ -719,10 +721,71 @@ namespace MedAtlas.Sims
                 for (int i = Due(ref accW, water * 1.2f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-1.1f, 2.4f), 0.35f, Random.Range(-0.2f, 0.2f)), new Vector3(0, 0.8f, 0), new Color(0.85f, 0.95f, 1f, 0.6f), 0.06f, 1.1f);
             }
             // secretion from the capillary into the tubule (PAH)
-            for (int i = Due(ref accS, sec * 30f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-0.6f, 2.6f), 1.05f, Random.Range(-0.2f, 0.2f)), new Vector3(0, -0.9f, 0), new Color(0.75f, 0.45f, 1f, 0.95f), 0.08f, 1.0f);
+            for (int i = Due(ref accS, sec * 30f, dt); i > 0; i--) Spawn(dots, new Vector3(Random.Range(-0.6f, 1.9f), 1.05f, Random.Range(-0.2f, 0.2f)), new Vector3(0, -0.9f, 0), new Color(0.75f, 0.45f, 1f, 0.95f), 0.08f, 1.0f);
             // what stays in the tubule leaves as urine
-            for (int i = Due(ref accU, urine * 30f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.3f; Spawn(dots, new Vector3(2.2f, r.x, r.y), new Vector3(1.0f, 0, 0), id == "clearance" ? fCol : new Color(1f, 0.9f, 0.3f, 0.95f), 0.09f, 1.0f); }
-            for (int i = Due(ref accRbcN, 6f + flow * 20f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.22f; Spawn(rbcs, new Vector3(-1.1f, 1.3f + r.x, r.y), new Vector3(1.4f, 0, 0), Color.white, 0.14f, 4f / 1.4f, Random.Range(0, 1000)); }
+            for (int i = Due(ref accU, urine * 30f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.3f; Spawn(dots, new Vector3(1.4f, r.x, r.y), new Vector3(0.8f, 0, 0), id == "clearance" ? fCol : new Color(1f, 0.9f, 0.3f, 0.95f), id == "clearance" ? 0.12f : 0.09f, 0.8f); }
+            for (int i = Due(ref accRbcN, 6f + flow * 20f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.22f; Spawn(rbcs, new Vector3(-1.2f, 1.3f + r.x, r.y), new Vector3(1.4f, 0, 0), Color.white, 0.14f, 3.3f / 1.4f, Random.Range(0, 1000)); }
+        }
+
+        // ------------------------------------------------------------ epithelium close-up
+        // Five tubular cells side by side: lumen (urine side) below, interstitium and a peritubular capillary above.
+        // Tight junctions seal the cells at their apical (lumen) side; the paracellular route passes through them,
+        // the transcellular route through the cells (apical channels, basolateral Na/K pump).
+        static readonly Color EpiCellCol = new Color(0.95f, 0.75f, 0.62f);
+        const int EpiCells = 5; const float EpiW = 0.9f, EpiStep = 0.98f;
+        readonly List<Material> junctionMats = new List<Material>();
+        float EpiX(int i) => (i - (EpiCells - 1) * 0.5f) * EpiStep;
+
+        void BuildEpithelium()
+        {
+            float span = EpiCells * EpiStep + 0.3f;
+            Prim(PrimitiveType.Cube, new Vector3(0, -1.0f, 0), new Vector3(span, 0.6f, 1.3f), Glass(new Color(1f, 0.9f, 0.55f), 0.05f, 0.35f));   // lumen
+            cellsMat = Glass(EpiCellCol, 0.12f, 0.6f);   // glass, so the ions crossing the cells stay visible
+            var nucleus = Lit(new Color(0.55f, 0.4f, 0.75f), 0.5f);
+            var brush = Lit(new Color(0.95f, 0.85f, 0.7f), 0.4f);
+            for (int i = 0; i < EpiCells; i++)
+            {
+                float x = EpiX(i);
+                Prim(PrimitiveType.Cube, new Vector3(x, 0, 0), new Vector3(EpiW, 1.2f, 1.1f), cellsMat);
+                Prim(PrimitiveType.Sphere, new Vector3(x, 0.15f, 0.56f), new Vector3(0.32f, 0.32f, 0.08f), nucleus);
+                for (int k = 0; k < 6; k++) Prim(PrimitiveType.Cube, new Vector3(x - 0.33f + k * 0.13f, -0.66f, 0), new Vector3(0.04f, 0.12f, 1.0f), brush);   // brush border
+                if (i < EpiCells - 1)
+                {
+                    var jm = Lit(new Color(0.35f, 0.25f, 0.2f), 0.5f); junctionMats.Add(jm);
+                    Prim(PrimitiveType.Cube, new Vector3(x + EpiStep * 0.5f, -0.5f, 0), new Vector3(0.1f, 0.16f, 1.12f), jm);   // tight junction
+                }
+            }
+            Prim(PrimitiveType.Cube, new Vector3(0, 0.66f, 0), new Vector3(span, 0.04f, 1.2f), Glass(new Color(0.9f, 0.9f, 1f), 0.08f, 0.5f));   // basement membrane
+            capMat = Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f);
+            RodX(new Vector3(0, 1.35f, 0), span, 0.3f, capMat);
+            rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
+            tuftMat = cellsMat;   // keeps the shared nephron code safe
+        }
+
+        void TickEpithelium(Dictionary<string, object> now, float dt)
+        {
+            float trans = F(now, "trans", 0, 7.6f, 0.4f), para = F(now, "para", 0, 4.5f, 0.3f), water = F(now, "water", 0, 32, 0.3f), cellNa = F(now, "c", 0, 140, 0.1f);
+            cellsMat.SetColor("_Color", Color.Lerp(EpiCellCol, new Color(1f, 0.55f, 0.3f), cellNa * 0.7f));
+            foreach (var jm in junctionMats) jm.SetColor("_EmissionColor", ClCol * para * 0.9f);
+            float half = (EpiCells * EpiStep) * 0.5f;
+            // tubular fluid flowing along the lumen
+            for (int i = Due(ref accF, 10f, dt); i > 0; i--) Spawn(dots, new Vector3(-half, -1.0f + Random.Range(-0.2f, 0.2f), Random.Range(-0.4f, 0.4f)), new Vector3(0.9f, 0, 0), new Color(1f, 0.92f, 0.5f, 0.7f), 0.06f, 2 * half / 0.9f);
+            // transcellular: Na+ enters at the apical side, crosses the cell and leaves at the base into the capillary
+            for (int i = Due(ref accR, 2f + trans * 30f, dt); i > 0; i--)
+            {
+                float x = EpiX(Random.Range(0, EpiCells)) + Random.Range(-0.3f, 0.3f);
+                Spawn(dots, new Vector3(x, -0.85f, Random.Range(-0.35f, 0.35f)), new Vector3(0, 0.95f, 0), NaCol, 0.08f, 2.3f);
+            }
+            // paracellular: ions slip through the tight junctions between the cells
+            for (int i = Due(ref accPara, para * 25f, dt); i > 0; i--)
+            {
+                float x = EpiX(Random.Range(0, EpiCells - 1)) + EpiStep * 0.5f;
+                Spawn(dots, new Vector3(x, -0.85f, Random.Range(-0.4f, 0.4f)), new Vector3(0, 0.95f, 0), ClCol, 0.07f, 2.3f);
+            }
+            // water follows the salt (both routes)
+            for (int i = Due(ref accW, 2f + water * 1.2f, dt); i > 0; i--)
+                Spawn(dots, new Vector3(Random.Range(-half, half), -0.85f, Random.Range(-0.4f, 0.4f)), new Vector3(0, 0.8f, 0), new Color(0.85f, 0.95f, 1f, 0.6f), 0.05f, 2.7f);
+            for (int i = Due(ref accRbcN, 14f, dt); i > 0; i--) { var r = Random.insideUnitCircle * 0.22f; Spawn(rbcs, new Vector3(-half, 1.35f + r.x, r.y), new Vector3(1.4f, 0, 0), Color.white, 0.14f, 2 * half / 1.4f, Random.Range(0, 1000)); }
         }
 
         // ============================================================ skin
@@ -747,7 +810,9 @@ namespace MedAtlas.Sims
             foreach (var x in new[] { -0.9f, 0.6f }) { Prim(PrimitiveType.Sphere, new Vector3(x, 0.56f, 0.3f), new Vector3(0.14f, 0.3f, 0.14f), meissMat); Ending(new Vector3(x, 0.42f, 0.3f), meissMat); }
             Prim(PrimitiveType.Sphere, new Vector3(-0.2f, 0.15f, 0.3f), new Vector3(0.42f, 0.1f, 0.1f), ruffMat); Ending(new Vector3(-0.2f, 0.12f, 0.3f), ruffMat);
             Prim(PrimitiveType.Sphere, new Vector3(1.6f, -0.75f, 0.3f), new Vector3(0.36f, 0.55f, 0.36f), pacMat); Rod(new Vector3(1.6f, -0.25f, 0.3f), new Vector3(1.6f, -0.5f, 0.3f), 0.025f, pacMat);
-            Ending(new Vector3(1.1f, 0.92f, 0.3f), coldMat); Ending(new Vector3(1.3f, 0.92f, 0.3f), warmMat); Ending(new Vector3(2.0f, 0.95f, 0.3f), painMat); Ending(new Vector3(-1.25f, 0.95f, 0.3f), painMat);
+            // free nerve endings, each with a small bulb at its tip so its glow is visible
+            void Free(Vector3 top, Material m) { Ending(top, m); Prim(PrimitiveType.Sphere, top, Vector3.one * 0.09f, m); }
+            Free(new Vector3(1.1f, 0.92f, 0.3f), coldMat); Free(new Vector3(1.3f, 0.92f, 0.3f), warmMat); Free(new Vector3(2.0f, 0.95f, 0.3f), painMat); Free(new Vector3(-1.25f, 0.95f, 0.3f), painMat);
             // dermal vessel (blood flow) and a sweat gland with its duct
             vesselSkinMat = Lit(new Color(0.75f, 0.12f, 0.12f), 0.6f);
             RodX(new Vector3(0, 0.05f, -0.45f), w * 0.95f, 0.09f, vesselSkinMat);
