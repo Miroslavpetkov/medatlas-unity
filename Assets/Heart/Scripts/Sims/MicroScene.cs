@@ -56,9 +56,14 @@ namespace MedAtlas.Sims
             var g = GameObject.CreatePrimitive(PrimitiveType.Sphere); sphereMesh = g.GetComponent<MeshFilter>().sharedMesh; Destroy(g); return sphereMesh;
         }
 
+        // part tags ("id|alias|...") per material, matched against the model's parts list when the user taps an object
+        readonly Dictionary<Material, string> matTags = new Dictionary<Material, string>();
+        Material T(Material m, string tag) { matTags[m] = tag; return m; }
+
         GameObject Prim(PrimitiveType t, Vector3 pos, Vector3 scale, Material m, Transform parent = null)
         {
             var g = GameObject.CreatePrimitive(t); Destroy(g.GetComponent<Collider>());
+            if (m != null && matTags.TryGetValue(m, out var tag)) g.name = tag;
             g.transform.SetParent(parent ?? transform, false); g.transform.localPosition = pos; g.transform.localScale = scale;
             g.GetComponent<Renderer>().sharedMaterial = m; return g;
         }
@@ -225,8 +230,8 @@ namespace MedAtlas.Sims
 
         void BuildMembrane()
         {
-            membraneMat = Lit(new Color(0.85f, 0.72f, 0.55f), 0.55f);
-            var tailMat = Lit(new Color(0.95f, 0.88f, 0.7f), 0.3f);
+            membraneMat = T(Lit(new Color(0.85f, 0.72f, 0.55f), 0.55f), "membrane");
+            var tailMat = T(Lit(new Color(0.95f, 0.88f, 0.7f), 0.3f), "membrane");
             // phospholipid heads: two leaflets of spheres combined into one mesh
             var sphere = SphereMesh();
             var combine = new List<CombineInstance>();
@@ -244,14 +249,14 @@ namespace MedAtlas.Sims
             if (id == "vesicles")
             {
                 // receptors for LDL on the outer face, vesicles budding inwards and fusing outwards
-                var recMat = Lit(new Color(0.55f, 0.8f, 0.35f), 0.7f);
+                var recMat = T(Lit(new Color(0.55f, 0.8f, 0.35f), 0.7f), "receptor|ligand");
                 for (int c = 0; c < 6; c++) Prim(PrimitiveType.Capsule, new Vector3(-1.3f + c * 0.18f, 0.45f, -0.2f + (c % 2) * 0.3f), new Vector3(0.08f, 0.14f, 0.08f), recMat);
                 vesLayer = NewLayer(SphereMesh(), Glass(new Color(0.95f, 0.85f, 0.55f), 0.25f, 0.85f));
                 return;
             }
             // channels
-            var naMat = Lit(new Color(0.85f, 0.25f, 0.2f), 0.7f); var kMat = Lit(new Color(0.25f, 0.45f, 0.95f), 0.7f);
-            var pumpMat = Lit(new Color(0.55f, 0.8f, 0.35f), 0.7f);
+            var naMat = T(Lit(new Color(0.85f, 0.25f, 0.2f), 0.7f), "nachan|nav|sglt|beta"); var kMat = T(Lit(new Color(0.25f, 0.45f, 0.95f), 0.7f), "kchan|kv|aqp");
+            var pumpMat = T(Lit(new Color(0.55f, 0.8f, 0.35f), 0.7f), "pump");
             for (int c = 0; c < 4; c++)
             {
                 var na = Prim(PrimitiveType.Cylinder, new Vector3(-1.1f + c * 0.75f, 0, -0.35f), new Vector3(0.2f, 0.42f, 0.2f), naMat); channelsNa.Add(na.transform);
@@ -295,16 +300,16 @@ namespace MedAtlas.Sims
         void BuildAxon()
         {
             int segs = 24; segMats = new Material[segs];
-            var myelin = Lit(new Color(0.95f, 0.93f, 0.88f), 0.5f);
+            var myelin = T(Lit(new Color(0.95f, 0.93f, 0.88f), 0.5f), "myelin|Aa|Ab");
             bool bare = id == "electrotonic";   // the cable experiment is on an unmyelinated fibre
             for (int i = 0; i < segs; i++)
             {
-                segMats[i] = Lit(new Color(0.85f, 0.55f, 0.45f), 0.6f);
+                segMats[i] = T(Lit(new Color(0.85f, 0.55f, 0.45f), 0.6f), "axon|axoplasm|membrane|nav|C");
                 var g = Prim(PrimitiveType.Cylinder, new Vector3(-2.4f + i * 0.2f, 0, 0), new Vector3(0.22f, 0.1f, 0.22f), segMats[i]);
                 g.transform.localRotation = Quaternion.Euler(0, 0, 90);
                 if (!bare && i % 4 != 0) { var s = Prim(PrimitiveType.Cylinder, new Vector3(-2.4f + i * 0.2f, 0, 0), new Vector3(0.36f, 0.095f, 0.36f), myelin); s.transform.localRotation = Quaternion.Euler(0, 0, 90); }
             }
-            var soma = Prim(PrimitiveType.Sphere, new Vector3(-2.85f, 0, 0), Vector3.one * 0.7f, Lit(new Color(0.8f, 0.5f, 0.45f), 0.6f));
+            var soma = Prim(PrimitiveType.Sphere, new Vector3(-2.85f, 0, 0), Vector3.one * 0.7f, T(Lit(new Color(0.8f, 0.5f, 0.45f), 0.6f), "neuron|cell|axon"));
             for (int d = 0; d < 6; d++)
             {
                 var den = Prim(PrimitiveType.Cylinder, Vector3.zero, new Vector3(0.06f, 0.35f, 0.06f), soma.GetComponent<Renderer>().sharedMaterial, soma.transform);
@@ -313,7 +318,7 @@ namespace MedAtlas.Sims
             if (id == "electrotonic" || id == "nerve-fibres")
             {
                 // stimulating electrode near the soma end, recording electrode further along
-                var el = Lit(new Color(0.75f, 0.75f, 0.8f), 0.9f);
+                var el = T(Lit(new Color(0.75f, 0.75f, 0.8f), 0.9f), "electrode|record");
                 Rod(new Vector3(-2.2f, 0.18f, 0), new Vector3(-2.2f, 1.2f, 0), 0.025f, el);
                 Rod(new Vector3(1.9f, 0.18f, 0), new Vector3(1.9f, 1.2f, 0), 0.025f, el);
             }
@@ -362,11 +367,11 @@ namespace MedAtlas.Sims
         Layer wbcs, lipo;
         void BuildVessel()
         {
-            var wall = Glass(new Color(1f, 0.45f, 0.42f, 1f));
+            var wall = T(Glass(new Color(1f, 0.45f, 0.42f, 1f)), "vessel|capillary|wall|arteriole|vein|endo|lam");
             RodX(Vector3.zero, 4f, 0.65f, wall);
             rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
             if (id == "haemostasis")
-                clot = Prim(PrimitiveType.Sphere, new Vector3(0, 0.62f, 0), Vector3.zero, Lit(new Color(0.55f, 0.05f, 0.08f), 0.4f)).transform;
+                clot = Prim(PrimitiveType.Sphere, new Vector3(0, 0.62f, 0), Vector3.zero, T(Lit(new Color(0.55f, 0.05f, 0.08f), 0.4f), "platelet|fibrin")).transform;
             if (id == "leukocytes" || id == "haemopoiesis" || id == "immune")
                 wbcs = NewLayer(SphereMesh(), Lit(new Color(0.92f, 0.9f, 0.95f), 0.5f));
             if (id == "lipids")
@@ -374,13 +379,13 @@ namespace MedAtlas.Sims
             if (id == "leukocytes")
             {
                 // the infected tissue above the vessel
-                Prim(PrimitiveType.Sphere, new Vector3(0.3f, 1.7f, 0), new Vector3(1.6f, 0.75f, 1.1f), Glass(new Color(0.6f, 0.9f, 0.5f), 0.04f, 0.35f));
+                Prim(PrimitiveType.Sphere, new Vector3(0.3f, 1.7f, 0), new Vector3(1.6f, 0.75f, 1.1f), T(Glass(new Color(0.6f, 0.9f, 0.5f), 0.04f, 0.35f), "tissue|site"));
             }
             if (id == "capillary" || id == "lymph")
             {
                 // tissue around and a blind-ended lymph capillary below
-                Prim(PrimitiveType.Cube, new Vector3(0, -0.45f, 0), new Vector3(3.9f, 2.7f, 2.2f), Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f));
-                RodX(new Vector3(0, -1.35f, 0), 3.6f, 0.32f, Glass(new Color(0.8f, 0.95f, 0.6f), 0.08f, 0.6f));
+                Prim(PrimitiveType.Cube, new Vector3(0, -0.45f, 0), new Vector3(3.9f, 2.7f, 2.2f), T(Glass(new Color(0.95f, 0.75f, 0.6f), 0.02f, 0.18f), "tissue"));
+                RodX(new Vector3(0, -1.35f, 0), 3.6f, 0.32f, T(Glass(new Color(0.8f, 0.95f, 0.6f), 0.08f, 0.6f), "lymph|lcap|lvessel"));
             }
         }
 
@@ -474,40 +479,40 @@ namespace MedAtlas.Sims
 
         void BuildSynapse()
         {
-            boutonMat = Glass(new Color(1f, 0.7f, 0.5f), 0.08f, 0.6f);
+            boutonMat = T(Glass(new Color(1f, 0.7f, 0.5f), 0.08f, 0.6f), "bouton|synapse|neuron");
             // axon and its ending (bouton) above the cleft
             Prim(PrimitiveType.Sphere, new Vector3(0, 1.5f, 0), new Vector3(2.6f, 1.8f, 1.8f), boutonMat);
             Rod(new Vector3(-0.4f, 2.2f, 0), new Vector3(-1.6f, 3.6f, 0), 0.28f, boutonMat);
-            var vesMat = Lit(new Color(0.95f, 0.9f, 0.7f), 0.7f);
+            var vesMat = T(Lit(new Color(0.95f, 0.9f, 0.7f), 0.7f), "vesicle");
             for (int i = 0; i < 26; i++)
             {
                 var p = new Vector3(Random.Range(-0.9f, 0.9f), Random.Range(0.85f, 1.7f), Random.Range(-0.5f, 0.5f));
                 vesicles.Add(Prim(PrimitiveType.Sphere, p, Vector3.one * 0.18f, vesMat));
             }
             // the active zone: voltage-gated Ca2+ channels
-            for (int c = 0; c < 4; c++) { var m = Lit(new Color(0.9f, 0.75f, 0.2f), 0.7f); caCh.Add(m); Prim(PrimitiveType.Cylinder, new Vector3(-0.75f + c * 0.5f, 0.66f, 0.2f), new Vector3(0.12f, 0.08f, 0.12f), m); }
+            for (int c = 0; c < 4; c++) { var m = T(Lit(new Color(0.9f, 0.75f, 0.2f), 0.7f), "ca|snare"); caCh.Add(m); Prim(PrimitiveType.Cylinder, new Vector3(-0.75f + c * 0.5f, 0.66f, 0.2f), new Vector3(0.12f, 0.08f, 0.12f), m); }
             // postsynaptic membrane (dendritic spine) and its receptors: AMPA, NMDA, GABA-A
-            postMat = Lit(new Color(0.85f, 0.6f, 0.65f), 0.55f);
+            postMat = T(Lit(new Color(0.85f, 0.6f, 0.65f), 0.55f), "spine|neuron|synapse");
             Prim(PrimitiveType.Sphere, new Vector3(0, -0.85f, 0), new Vector3(3.0f, 1.2f, 1.9f), postMat);
             Rod(new Vector3(0.2f, -1.2f, 0), new Vector3(1.2f, -2.8f, 0), 0.35f, postMat);
             var rc = new[] { new Color(1f, 0.4f, 0.3f), new Color(0.35f, 0.5f, 1f), new Color(0.35f, 0.9f, 0.45f) };
             for (int r = 0; r < 6; r++)
             {
-                int t = r % 3; var m = Lit(rc[t], 0.7f); receptors.Add((m, t));
+                int t = r % 3; var m = T(Lit(rc[t], 0.7f), t == 0 ? "ampa" : t == 1 ? "nmda" : "gabaa|meta"); receptors.Add((m, t));
                 Prim(PrimitiveType.Cylinder, new Vector3(-1.0f + r * 0.4f, -0.27f, -0.15f + (r % 2) * 0.3f), new Vector3(0.13f, 0.09f, 0.13f), m);
             }
             if (id == "neuron-glia")
             {
                 // astrocyte wrapping the synapse, with an end-foot on a capillary; a microglial cell when inflamed
-                astroMat = Lit(new Color(0.55f, 0.75f, 0.95f), 0.5f);
+                astroMat = T(Lit(new Color(0.55f, 0.75f, 0.95f), 0.5f), "astro|endfoot");
                 astro = Prim(PrimitiveType.Sphere, new Vector3(2.6f, 0.2f, 0), Vector3.one * 1.1f, astroMat).transform;
                 Rod(new Vector3(2.6f, 0.2f, 0), new Vector3(1.25f, 0.25f, 0), 0.16f, astroMat);
                 Rod(new Vector3(2.6f, 0.2f, 0), new Vector3(2.9f, -1.6f, 0), 0.2f, astroMat);
                 Rod(new Vector3(2.6f, 0.2f, 0), new Vector3(3.4f, 1.8f, 0.3f), 0.12f, astroMat);
                 Rod(new Vector3(2.6f, 0.2f, 0), new Vector3(3.8f, 0.6f, -0.4f), 0.12f, astroMat);
-                var cap = Prim(PrimitiveType.Cylinder, new Vector3(2.9f, -2.1f, 0), new Vector3(0.8f, 1.4f, 0.8f), Glass(new Color(1f, 0.45f, 0.42f)));
+                var cap = Prim(PrimitiveType.Cylinder, new Vector3(2.9f, -2.1f, 0), new Vector3(0.8f, 1.4f, 0.8f), T(Glass(new Color(1f, 0.45f, 0.42f)), "capillary"));
                 cap.transform.localRotation = Quaternion.Euler(90, 0, 0);
-                microglia = Prim(PrimitiveType.Sphere, new Vector3(-2.4f, -0.4f, 0.4f), Vector3.zero, Lit(new Color(0.75f, 0.6f, 0.4f), 0.4f)).transform;
+                microglia = Prim(PrimitiveType.Sphere, new Vector3(-2.4f, -0.4f, 0.4f), Vector3.zero, T(Lit(new Color(0.75f, 0.6f, 0.4f), 0.4f), "microglia")).transform;
             }
         }
 
@@ -554,10 +559,10 @@ namespace MedAtlas.Sims
 
         void BuildSarcomere()
         {
-            zMat = Lit(new Color(0.45f, 0.4f, 0.6f), 0.6f);
-            var thick = Lit(new Color(0.7f, 0.25f, 0.3f), 0.6f); var thin = Lit(new Color(0.95f, 0.85f, 0.7f), 0.5f);
-            headMat = Lit(new Color(0.9f, 0.35f, 0.4f), 0.6f);
-            var mline = Glass(new Color(0.8f, 0.6f, 0.9f), 0.05f, 0.4f);
+            zMat = T(Lit(new Color(0.45f, 0.4f, 0.6f), 0.6f), "zdisc");
+            var thick = T(Lit(new Color(0.7f, 0.25f, 0.3f), 0.6f), "myosin"); var thin = T(Lit(new Color(0.95f, 0.85f, 0.7f), 0.5f), "actin|tropo");
+            headMat = T(Lit(new Color(0.9f, 0.35f, 0.4f), 0.6f), "myosin");
+            var mline = T(Glass(new Color(0.8f, 0.6f, 0.9f), 0.05f, 0.4f), "mline");
             Prim(PrimitiveType.Cube, Vector3.zero, new Vector3(0.04f, 2.1f, 2.1f), mline);
             foreach (int side in new[] { -1, 1 })
             {
@@ -618,10 +623,10 @@ namespace MedAtlas.Sims
         void BuildSmooth()
         {
             cell = new GameObject("Cell").transform; cell.SetParent(transform, false);
-            cellMat = Glass(new Color(0.95f, 0.55f, 0.55f), 0.08f, 0.6f);
+            cellMat = T(Glass(new Color(0.95f, 0.55f, 0.55f), 0.08f, 0.6f), "cell");
             Prim(PrimitiveType.Sphere, Vector3.zero, new Vector3(5.2f, 1.3f, 1.3f), cellMat, cell);
-            Prim(PrimitiveType.Sphere, Vector3.zero, new Vector3(1.3f, 0.45f, 0.45f), Lit(new Color(0.55f, 0.35f, 0.75f), 0.5f), cell);
-            var dense = Lit(new Color(0.3f, 0.2f, 0.25f), 0.4f); bundleMat = Lit(new Color(0.85f, 0.5f, 0.45f), 0.6f);
+            Prim(PrimitiveType.Sphere, Vector3.zero, new Vector3(1.3f, 0.45f, 0.45f), T(Lit(new Color(0.55f, 0.35f, 0.75f), 0.5f), "cell"), cell);
+            var dense = T(Lit(new Color(0.3f, 0.2f, 0.25f), 0.4f), "dense"); bundleMat = T(Lit(new Color(0.85f, 0.5f, 0.45f), 0.6f), "myosin|mlck");
             var pts = new List<Vector3>();
             for (int i = 0; i < 22; i++)
             {
@@ -661,21 +666,21 @@ namespace MedAtlas.Sims
         {
             if (id == "epithelium") { BuildEpithelium(); return; }
             // Bowman's capsule with the glomerular tuft, afferent and efferent arterioles
-            Prim(PrimitiveType.Sphere, new Vector3(-2.4f, 0, 0), Vector3.one * 1.7f, Glass(new Color(0.6f, 0.8f, 1f), 0.05f, 0.45f));
-            tuftMat = Lit(new Color(0.8f, 0.15f, 0.15f), 0.6f);
+            Prim(PrimitiveType.Sphere, new Vector3(-2.4f, 0, 0), Vector3.one * 1.7f, T(Glass(new Color(0.6f, 0.8f, 1f), 0.05f, 0.45f), "bowman|glomerulus"));
+            tuftMat = T(Lit(new Color(0.8f, 0.15f, 0.15f), 0.6f), "glomerulus");
             for (int i = 0; i < 26; i++) Prim(PrimitiveType.Sphere, new Vector3(-2.4f, 0.05f, 0) + Random.insideUnitSphere * 0.45f, Vector3.one * 0.24f, tuftMat);
-            var art = Lit(new Color(0.8f, 0.15f, 0.15f), 0.6f);
+            var art = T(Lit(new Color(0.8f, 0.15f, 0.15f), 0.6f), "afferent|arteriole");
             Rod(new Vector3(-2.55f, 0.4f, 0.1f), new Vector3(-2.9f, 2.0f, 0.1f), 0.12f, art);
-            Rod(new Vector3(-2.25f, 0.4f, -0.1f), new Vector3(-1.8f, 1.6f, -0.1f), 0.09f, art);
+            Rod(new Vector3(-2.25f, 0.4f, -0.1f), new Vector3(-1.8f, 1.6f, -0.1f), 0.09f, art).name = "efferent|arteriole";
             // the tubule leaving the capsule, its epithelium and the peritubular capillary above it
-            RodX(new Vector3(0.35f, 0, 0), 3.5f, 0.5f, Glass(new Color(1f, 0.9f, 0.55f), 0.06f, 0.5f));
-            cellsMat = Lit(new Color(0.85f, 0.7f, 0.6f), 0.5f);
+            RodX(new Vector3(0.35f, 0, 0), 3.5f, 0.5f, T(Glass(new Color(1f, 0.9f, 0.55f), 0.06f, 0.5f), "proximal|loop|urine|lumen"));
+            cellsMat = T(Lit(new Color(0.85f, 0.7f, 0.6f), 0.5f), "proximal|distal|cell");
             for (int i = 0; i < 8; i++)
             {
                 Prim(PrimitiveType.Cube, new Vector3(-1.05f + i * 0.42f, 0.62f, 0), new Vector3(0.38f, 0.3f, 0.7f), cellsMat);
                 Prim(PrimitiveType.Cube, new Vector3(-1.05f + i * 0.42f, -0.62f, 0), new Vector3(0.38f, 0.3f, 0.7f), cellsMat);
             }
-            capMat = Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f);
+            capMat = T(Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f), "peritub|capillary");
             RodX(new Vector3(0.45f, 1.3f, 0), 3.4f, 0.3f, capMat);
             rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
         }
@@ -739,10 +744,10 @@ namespace MedAtlas.Sims
         void BuildEpithelium()
         {
             float span = EpiCells * EpiStep + 0.3f;
-            Prim(PrimitiveType.Cube, new Vector3(0, -1.0f, 0), new Vector3(span, 0.6f, 1.3f), Glass(new Color(1f, 0.9f, 0.55f), 0.05f, 0.35f));   // lumen
-            cellsMat = Glass(EpiCellCol, 0.12f, 0.6f);   // glass, so the ions crossing the cells stay visible
-            var nucleus = Lit(new Color(0.55f, 0.4f, 0.75f), 0.5f);
-            var brush = Lit(new Color(0.95f, 0.85f, 0.7f), 0.4f);
+            Prim(PrimitiveType.Cube, new Vector3(0, -1.0f, 0), new Vector3(span, 0.6f, 1.3f), T(Glass(new Color(1f, 0.9f, 0.55f), 0.05f, 0.35f), "lumen"));   // lumen
+            cellsMat = T(Glass(EpiCellCol, 0.12f, 0.6f), "cell");   // glass, so the ions crossing the cells stay visible
+            var nucleus = T(Lit(new Color(0.55f, 0.4f, 0.75f), 0.5f), "cell");
+            var brush = T(Lit(new Color(0.95f, 0.85f, 0.7f), 0.4f), "apical");
             for (int i = 0; i < EpiCells; i++)
             {
                 float x = EpiX(i);
@@ -751,12 +756,12 @@ namespace MedAtlas.Sims
                 for (int k = 0; k < 6; k++) Prim(PrimitiveType.Cube, new Vector3(x - 0.33f + k * 0.13f, -0.66f, 0), new Vector3(0.04f, 0.12f, 1.0f), brush);   // brush border
                 if (i < EpiCells - 1)
                 {
-                    var jm = Lit(new Color(0.35f, 0.25f, 0.2f), 0.5f); junctionMats.Add(jm);
+                    var jm = T(Lit(new Color(0.35f, 0.25f, 0.2f), 0.5f), "tj"); junctionMats.Add(jm);
                     Prim(PrimitiveType.Cube, new Vector3(x + EpiStep * 0.5f, -0.5f, 0), new Vector3(0.1f, 0.16f, 1.12f), jm);   // tight junction
                 }
             }
-            Prim(PrimitiveType.Cube, new Vector3(0, 0.66f, 0), new Vector3(span, 0.04f, 1.2f), Glass(new Color(0.9f, 0.9f, 1f), 0.08f, 0.5f));   // basement membrane
-            capMat = Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f);
+            Prim(PrimitiveType.Cube, new Vector3(0, 0.66f, 0), new Vector3(span, 0.04f, 1.2f), T(Glass(new Color(0.9f, 0.9f, 1f), 0.08f, 0.5f), "basal"));   // basement membrane
+            capMat = T(Glass(new Color(1f, 0.4f, 0.4f), 0.08f, 0.6f), "blood|capillary");
             RodX(new Vector3(0, 1.35f, 0), span, 0.3f, capMat);
             rbcs = NewLayer(DiscMesh(), Lit(new Color(0.75f, 0.08f, 0.08f), 0.7f));
             tuftMat = cellsMat;   // keeps the shared nephron code safe
@@ -794,16 +799,16 @@ namespace MedAtlas.Sims
         void BuildSkin()
         {
             float w = 4.6f, d = 2.2f;
-            epiMat = Lit(new Color(0.93f, 0.76f, 0.65f), 0.35f);
+            epiMat = T(Lit(new Color(0.93f, 0.76f, 0.65f), 0.35f), "epidermis|epi|melanocyte");
             Prim(PrimitiveType.Cube, new Vector3(0, 0.88f, 0), new Vector3(w, 0.24f, d), epiMat);
-            Prim(PrimitiveType.Cube, new Vector3(0, 0.25f, 0), new Vector3(w, 1.02f, d), Glass(new Color(1f, 0.6f, 0.6f), 0.04f, 0.4f));
-            Prim(PrimitiveType.Cube, new Vector3(0, -0.75f, 0), new Vector3(w, 0.98f, d), Glass(new Color(1f, 0.88f, 0.5f), 0.04f, 0.4f));
+            Prim(PrimitiveType.Cube, new Vector3(0, 0.25f, 0), new Vector3(w, 1.02f, d), T(Glass(new Color(1f, 0.6f, 0.6f), 0.04f, 0.4f), "dermis|derm"));
+            Prim(PrimitiveType.Cube, new Vector3(0, -0.75f, 0), new Vector3(w, 0.98f, d), T(Glass(new Color(1f, 0.88f, 0.5f), 0.04f, 0.4f), "hypodermis|derm"));
             // receptors at their depths: Merkel discs at the base of the epidermis, Meissner corpuscles in the papillae,
             // Ruffini endings in the dermis, Pacinian corpuscles deep, free nerve endings (cold, warm, pain) up into the epidermis
-            merkelMat = Lit(new Color(0.95f, 0.8f, 0.3f), 0.6f); meissMat = Lit(new Color(0.9f, 0.5f, 0.7f), 0.6f);
-            pacMat = Lit(new Color(0.75f, 0.85f, 0.95f), 0.6f); ruffMat = Lit(new Color(0.6f, 0.9f, 0.6f), 0.6f);
-            coldMat = Lit(new Color(0.4f, 0.6f, 1f), 0.6f); warmMat = Lit(new Color(1f, 0.55f, 0.3f), 0.6f); painMat = Lit(new Color(1f, 0.85f, 0.85f), 0.6f);
-            var nerve = Lit(new Color(0.95f, 0.9f, 0.6f), 0.5f);
+            merkelMat = T(Lit(new Color(0.95f, 0.8f, 0.3f), 0.6f), "merkel"); meissMat = T(Lit(new Color(0.9f, 0.5f, 0.7f), 0.6f), "meissner");
+            pacMat = T(Lit(new Color(0.75f, 0.85f, 0.95f), 0.6f), "pacini"); ruffMat = T(Lit(new Color(0.6f, 0.9f, 0.6f), 0.6f), "ruffini");
+            coldMat = T(Lit(new Color(0.4f, 0.6f, 1f), 0.6f), "free"); warmMat = T(Lit(new Color(1f, 0.55f, 0.3f), 0.6f), "free"); painMat = T(Lit(new Color(1f, 0.85f, 0.85f), 0.6f), "free|adelta|cfib");
+            var nerve = T(Lit(new Color(0.95f, 0.9f, 0.6f), 0.5f), "abeta|nerve");
             RodX(new Vector3(0, -0.25f, 0.3f), w * 0.95f, 0.05f, nerve);
             void Ending(Vector3 top, Material m) { Rod(new Vector3(top.x, -0.25f, 0.3f), top, 0.04f, m); }
             foreach (var x in new[] { -1.9f, -1.6f }) { Prim(PrimitiveType.Sphere, new Vector3(x, 0.74f, 0.3f), new Vector3(0.16f, 0.05f, 0.16f), merkelMat); Ending(new Vector3(x, 0.72f, 0.3f), merkelMat); }
@@ -814,14 +819,14 @@ namespace MedAtlas.Sims
             void Free(Vector3 top, Material m) { Ending(top, m); Prim(PrimitiveType.Sphere, top, Vector3.one * 0.14f, m); }
             Free(new Vector3(1.1f, 0.92f, 0.3f), coldMat); Free(new Vector3(1.3f, 0.92f, 0.3f), warmMat); Free(new Vector3(2.0f, 0.95f, 0.3f), painMat); Free(new Vector3(-1.25f, 0.95f, 0.3f), painMat);
             // dermal vessel (blood flow) and a sweat gland with its duct
-            vesselSkinMat = Lit(new Color(0.75f, 0.12f, 0.12f), 0.6f);
+            vesselSkinMat = T(Lit(new Color(0.75f, 0.12f, 0.12f), 0.6f), "vessels");
             RodX(new Vector3(0, 0.05f, -0.45f), w * 0.95f, 0.09f, vesselSkinMat);
-            var gland = Lit(new Color(0.75f, 0.85f, 0.95f), 0.6f);
+            var gland = T(Lit(new Color(0.75f, 0.85f, 0.95f), 0.6f), "sweat");
             for (int i = 0; i < 10; i++) Prim(PrimitiveType.Sphere, new Vector3(-0.9f, -0.45f, -0.5f) + Random.insideUnitSphere * 0.18f, Vector3.one * 0.13f, gland);
             Rod(new Vector3(-0.9f, -0.4f, -0.5f), new Vector3(-0.9f, 1.0f, -0.5f), 0.035f, gland);
             if (id == "touch")
             {
-                probeMat = Lit(new Color(0.8f, 0.8f, 0.85f), 0.8f);
+                probeMat = T(Lit(new Color(0.8f, 0.8f, 0.85f), 0.8f), "probe");
                 probe = Prim(PrimitiveType.Capsule, new Vector3(-1.0f, 1.9f, 0.3f), new Vector3(0.25f, 0.5f, 0.25f), probeMat).transform;
             }
         }

@@ -36,7 +36,7 @@ namespace MedAtlas.Sims
         readonly List<Strip> strips = new List<Strip>(); readonly List<XY> xys = new List<XY>();
         const int N = 400;
         float sampleDt = 0.004f; float curveTimer;
-        float statsH; float opacity = 1f; bool journeyPack; string packName; float viewShiftX;
+        float statsH; float opacity = 1f; bool journeyPack; string packName; float viewShiftX; PartPicker picker;
         void ApplyOpacity(float o)
         {
             opacity = o;
@@ -362,6 +362,8 @@ namespace MedAtlas.Sims
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
             layout = ResponsiveLayout.Attach(C, orbit, 1.75f);
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
+            // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
+            picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
             LayoutCard();
         }
 
