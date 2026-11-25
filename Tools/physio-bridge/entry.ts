@@ -1,5 +1,19 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
+import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
+import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit } from './mirror';
+
+// The web scenes load real anatomy (real/<topic>.bin, body/…) with relative URLs. The Unity page lives on another
+// path, so those requests go to the published web version (same origin on GitHub Pages, and it allows CORS).
+const WEB = 'https://miroslavpetkov.github.io/medatlas3d-site-public/';
+if (typeof window !== 'undefined' && window.fetch && !(window as any).__medMirrorFetch) {
+  (window as any).__medMirrorFetch = true;
+  const f0 = window.fetch.bind(window);
+  window.fetch = ((input: any, init?: any) => {
+    if (typeof input === 'string' && /^(\.\/)?(real|body)\//.test(input)) input = ((window as any).MEDMIRROR_WEB ?? WEB) + input.replace(/^\.\//, '');
+    return f0(input, init);
+  }) as typeof fetch;
+}
 // "Пътят през тялото" (the journeys) now live in the web list too (web #88–#93), so Unity uses them from there.
 // Journeys first, so they open the list as before.
 const PHYSIO: any[] = [...BASE.filter((m: any) => m.area === 'Journey'), ...BASE.filter((m: any) => m.area !== 'Journey')];
@@ -58,6 +72,8 @@ function def(m: any) {
     speeds: m.speeds, learn: (m.learn ?? []).map(bg),
     parts: (m.parts ?? []).map((p: any) => ({ id: p.id, name: bg(p.name), latin: p.latin ?? '', description: bg(p.description) ?? '', fn: bg(p.fn) ?? '' })),
     sampleDt: m.sampleDt ?? 0.004,
+    // the drug layer: a time course laid over sliders the model already has (web drugs.ts); Unity applies it the same way
+    drugs: drugsFor(m.id).map((d: any) => ({ id: d.id, label: bg(d.label), group: bg(d.group), how: bg(d.how), onset: d.onset, peak: d.peak, half: d.half, moves: d.moves })),
   };
 }
 
@@ -86,6 +102,16 @@ const api = {
     return JSON.stringify({ t: s.inst.t, samples: out, now: samples.length ? samples[samples.length - 1] : readFor(s), stats: st,
       phase: { title: bg(ph.title), text: bg(ph.text), color: ph.color ?? '' } });
   },
+  // the scene mirror (mirror.ts): the web 3D scene of instance h, drawn by Unity
+  sceneBuild: (h: number) => mirrorBuild(h, insts[h]),
+  sceneDispose: (h: number) => mirrorDispose(h),
+  sceneFrame: (h: number, dt: number) => mirrorFrame(h, dt),
+  sceneFrameData: (h: number) => mirrorFrameData(h),
+  sceneStructure: (h: number) => mirrorStructure(h),
+  sceneGeom: (h: number, gid: number) => mirrorGeom(h, gid),
+  sceneIndex: (h: number, gid: number, tri: number) => mirrorIndex(h, gid, !!tri),
+  sceneTex: (h: number, tid: number) => mirrorTex(h, tid),
+  sceneFit: (h: number, aspect: number, fov: number) => mirrorFit(h, aspect, fov),
   curve: (h: number, i: number) => { const s = insts[h]; const x = s.m.xy[i]; return JSON.stringify(x.curve ? x.curve(s.v) : []); },
 };
 (globalThis as any).MedPhysio = api;

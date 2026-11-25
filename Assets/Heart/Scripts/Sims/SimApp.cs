@@ -24,7 +24,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; MicroScene micro;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; SceneMirror mirror;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -40,6 +40,7 @@ namespace MedAtlas.Sims
         void ApplyOpacity(float o)
         {
             opacity = o;
+            if (mirror != null) mirror.Opacity = o;
             if (heart != null) heart.SetOpacity(o);
             if (lungs != null) lungs.SetOpacity(o);
             if (journey != null) journey.Opacity = o;
@@ -144,22 +145,6 @@ namespace MedAtlas.Sims
             switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }   // special and regional use the torso at 60 %
         }
 
-        /// <summary>Camera distance per cell scene, so the whole scene sits between the info card and the charts.</summary>
-        static float MicroDistance(MicroScene.Kind k)
-        {
-            switch (k)
-            {
-                case MicroScene.Kind.Synapse: return 14f;
-                case MicroScene.Kind.Sarcomere: return 15f;
-                case MicroScene.Kind.Nephron: return 15.5f;
-                case MicroScene.Kind.Skin: return 17f;
-                case MicroScene.Kind.Smooth: return 11.5f;
-                case MicroScene.Kind.Membrane: return 10f;
-                case MicroScene.Kind.Vessel: return 13.5f;
-                default: return 9.2f;   // axon
-            }
-        }
-
         static Bounds MeshBounds(Transform root)
         {
             var b = new Bounds(); bool any = false;
@@ -171,40 +156,107 @@ namespace MedAtlas.Sims
             return b;
         }
 
-        public static MicroScene.Kind? MicroFor(string id)
+        // ---------------------------------------------------------------- hooks for the phone sheet (PhoneSheet)
+        public D Def => def;
+        public string PresetId => presetId;
+        public string PhaseTitle => phaseTitle != null ? phaseTitle.text : "";
+        public Color PhaseColor => phaseDot != null ? phaseDot.color : UIKit.Accent;
+        public readonly string[] KeyVal = { "—", "—", "—", "—" };
+        public readonly bool[] KeyBad = new bool[4];
+        public RectTransform GraphsPanel => C != null ? C.Find("Graphs") as RectTransform : null;
+        public RectTransform ParamsPanel => parPanel;
+        public RectTransform CardPanel => card;
+        public RectTransform BarPanel => C != null ? C.Find("Controls") as RectTransform : null;
+        public void Preset(string id) => ApplyPreset(id);
+        public void Act(string id) => PhysioBridge.Act(handle, id);
+        public string PresetLabel()
         {
-            switch (id)
+            var p = MiniJson.O(MiniJson.L(def["presets"]).Find(o => MiniJson.S(MiniJson.O(o), "id") == presetId));
+            return p != null ? MiniJson.S(p, "label") : "Твои настройки";
+        }
+
+        // ---------------------------------------------------------------- drugs (same rule as the web drug layer)
+        // A drug is a time course laid over sliders the model already has: strength = rise (onset) x fall (half-life after the peak).
+        class Dose { public D drug; public float t0; }
+        readonly List<Dose> doses = new List<Dose>();
+        float modelTime, drugPush;
+        public string LastDrugHow = "";
+        public string DrugStatus()
+        {
+            if (doses.Count == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (var d in doses) sb.Append(MiniJson.S(d.drug, "label")).Append("  ").Append(Mathf.RoundToInt(DrugStrength(d.drug, modelTime - d.t0) * 100)).Append(" %\n");
+            return sb.ToString().TrimEnd();
+        }
+        static float DrugStrength(D d, float dt)
+        {
+            if (dt <= 0) return 0;
+            float onset = Mathf.Max(0.05f, (float)MiniJson.D(d, "onset", 1)), peak = (float)MiniJson.D(d, "peak", 1), half = Mathf.Max(0.05f, (float)MiniJson.D(d, "half", 1));
+            float rise = 1 - Mathf.Exp(-dt / onset);
+            float fall = dt <= peak ? 1 : Mathf.Exp(-(dt - peak) * 0.6931472f / half);
+            return rise * fall;
+        }
+        public void GiveDrug(string id)
+        {
+            var d = MiniJson.O(MiniJson.L(def.ContainsKey("drugs") ? def["drugs"] : null).Find(o => MiniJson.S(MiniJson.O(o), "id") == id));
+            if (d == null) return;
+            doses.Add(new Dose { drug = d, t0 = modelTime }); LastDrugHow = MiniJson.S(d, "how"); drugPush = 0;
+        }
+        D WithDrugs()
+        {
+            var o = new D(values);
+            foreach (var dose in doses)
             {
-                case "membrane": case "cardiac-ap": case "signal": case "vesicles": case "potassium": return MicroScene.Kind.Membrane;
-                case "action-potential": case "electrotonic": case "nerve-fibres": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups":
-                case "leukocytes": case "haemopoiesis": case "plasma": case "lipids": case "lymph": return MicroScene.Kind.Vessel;
-                case "synapse-receptors": case "neuron-glia": return MicroScene.Kind.Synapse;
-                case "muscle": return MicroScene.Kind.Sarcomere;
-                case "smooth": return MicroScene.Kind.Smooth;
-                case "kidney-filtration": case "epithelium": case "clearance": return MicroScene.Kind.Nephron;
-                case "skin": case "touch": return MicroScene.Kind.Skin;
+                float k = DrugStrength(dose.drug, modelTime - dose.t0); if (k <= 0.001f) continue;
+                foreach (var mo in MiniJson.L(dose.drug["moves"]))
+                {
+                    var mv = MiniJson.O(mo); string id = MiniJson.S(mv, "id");
+                    double cur = o.TryGetValue(id, out var cv) ? MiniJson.Num(cv, 0) : 0;
+                    if (mv.ContainsKey("mul")) cur = cur * (1 + (MiniJson.Num(mv["mul"], 1) - 1) * k);
+                    if (mv.ContainsKey("add")) cur = cur + MiniJson.Num(mv["add"], 0) * k;
+                    o[id] = cur;
+                }
             }
-            return null;
+            foreach (var so in MiniJson.L(def["sliders"]))
+            {
+                var sl = MiniJson.O(so); string id = MiniJson.S(sl, "id");
+                if (o.TryGetValue(id, out var v) && v is double dv) o[id] = (double)Mathf.Clamp((float)dv, (float)MiniJson.D(sl, "min"), (float)MiniJson.D(sl, "max"));
+            }
+            return o;
+        }
+        void TickDrugs(float modelDt, float dt)
+        {
+            modelTime += modelDt;
+            if (doses.Count == 0) return;
+            drugPush -= dt; if (drugPush > 0) return; drugPush = 0.2f;
+            doses.RemoveAll(d => modelTime - d.t0 > (float)MiniJson.D(d.drug, "peak", 1) && DrugStrength(d.drug, modelTime - d.t0) < 0.01f);
+            PhysioBridge.Set(handle, MiniJson.Write(doses.Count > 0 ? WithDrugs() : values));
+        }
+
+        /// <summary>The web viewer's framing (fitView) for this view's shape, from the same look direction.</summary>
+        void FrameMirror(bool first)
+        {
+            if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect), cam.fieldOfView, out var target, out var dist)) return;
+            dist *= 1.25f;   // the web fits an open view; here the info card and the charts cover part of it
+            orbit.Target = target;
+            orbit.SetView(SceneMirror.WebYaw, SceneMirror.WebPitch, dist);
+            orbit.MinDistance = dist * 0.15f; orbit.MaxDistance = dist * 4f;
+            cam.nearClipPlane = Mathf.Max(0.002f, dist / 150f);   // cell scenes are small: keep the near plane in front of them
+            if (first) { orbit.Yaw = SceneMirror.WebYaw; orbit.Pitch = SceneMirror.WebPitch; orbit.Distance = dist; }
         }
 
         void Build3D(string area, string id)
         {
-            var mk = MicroFor(id);
-            if (mk != null)
+            if (id != "debug")
             {
-                var mroot = new GameObject("Micro"); micro = mroot.AddComponent<MicroScene>(); micro.Build(mk.Value, id);
-                orbit.Distance = MicroDistance(mk.Value); orbit.MinDistance = 2f; orbit.MaxDistance = 26f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
-                // frame what was actually built: aim at the middle of the meshes and back off so all of it fits (30 deg FOV)
-                var mb = MeshBounds(mroot.transform);
-                if (mb.size.sqrMagnitude > 0.01f)
-                {
-                    // fit the height (bounding radius) and the width into the ~60 % of the screen left free by the panels
-                    float aspect = Mathf.Max(0.5f, cam != null ? cam.aspect : 1.6f);
-                    float wide = Mathf.Max(mb.extents.x, mb.extents.z) / (Mathf.Tan(15f * Mathf.Deg2Rad) * aspect * 0.6f);
-                    orbit.Target = mb.center; orbit.Distance = Mathf.Clamp(Mathf.Max(Mathf.Max(mb.extents.magnitude * 3.1f, wide), MicroDistance(mk.Value)), 6f, 26f);   // particles (filaments, cells) are not in the bounds: keep a floor per kind
-                }
-                viewShiftX = mk.Value == MicroScene.Kind.Skin ? 0.08f : 0.11f;   // cell scenes are wide: keep them left of the chart column
+                // The web version's own scene for this model, drawn by Unity (SceneMirror): same objects, animation,
+                // particles, labels and camera in both versions. No stand-in organs (instructions v4, part I).
+                mirror = SceneMirror.Create(handle, cam);
+                if (mirror == null) { Debug.LogWarning("Web scene not available for " + id); return; }
+                cam.fieldOfView = 40f;   // the web camera's field of view, so the framing and perspective match
+                FrameMirror(true);
+                mirror.OnStructure = () => { if (mirror.Settling) FrameMirror(false); };   // real anatomy arrives a moment later
+                viewShiftX = 0.08f;
                 return;
             }
             if (id == "human" || id == "exercise") area = "Heart";
@@ -340,7 +392,7 @@ namespace MedAtlas.Sims
             UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(110, H), () => orbit.ResetView()); x0 += 110 + G;
             UIKit.Btn fb = null;
             fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
-            if (heart != null || lungs != null || organ != null)
+            if (heart != null || lungs != null || organ != null || mirror != null)
             {
                 // opacity of the organs, 1–100 (100 = solid); the body journeys start as glass so the food stays visible
                 float start = organ != null ? StartOpacity(SelectedId, packName) : 100; opacity = start / 100f;
@@ -354,16 +406,20 @@ namespace MedAtlas.Sims
             bar.sizeDelta = new Vector2(x0 + 4, 64);
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
-            if (heart == null && lungs == null && organ == null && micro == null)
+            if (heart == null && lungs == null && organ == null && mirror == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             string creditText = "Физиологичен модел: Med Simulation 3D. Само за обучение.";
-            if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
+            if (mirror != null) creditText += " 3D сцена: същата като в уеб версията; анатомия от Z-Anatomy (CC BY-SA 4.0) и BodyParts3D (CC BY 4.0).";
+            else if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
             var credit = UIKit.Label(C, creditText, 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
-            layout = ResponsiveLayout.Attach(C, orbit, packName == "brain" ? 2.5f : packName == "uterus" || packName == "male" ? 2.2f : 1.75f);   // wide packs need more room on a tall phone screen
+            layout = ResponsiveLayout.Attach(C, orbit, mirror != null ? 1f : packName == "brain" ? 2.5f : packName == "uterus" || packName == "male" ? 2.2f : 1.75f);   // wide packs need more room on a tall phone screen
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
             // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
             picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
+            // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
+            layout.SheetMode = true;
+            PhoneSheet.Attach(this, C, layout, orbit);
             LayoutCard();
         }
 
@@ -588,6 +644,7 @@ namespace MedAtlas.Sims
             if (!ready) return;
             float dt = Mathf.Min(Time.deltaTime, 0.05f);
             float modelDt = paused ? 0 : dt * speedK;
+            TickDrugs(modelDt, dt);
             int maxSamples = 200;
             var res = MiniJson.O(MiniJson.Parse(PhysioBridge.Step(handle, modelDt, maxSamples)));
             if (res == null) return;
@@ -657,7 +714,7 @@ namespace MedAtlas.Sims
 
             // stats
             var stv = MiniJson.O(res["stats"]);
-            var sb = new System.Text.StringBuilder();
+            var sb = new System.Text.StringBuilder(); int keyIdx = 0;
             foreach (var o in MiniJson.L(def["stats"]))
             {
                 var s = MiniJson.O(o); string id = MiniJson.S(s, "id"); int dp = (int)MiniJson.D(s, "dp", 0); string unit = MiniJson.S(s, "unit");
@@ -671,6 +728,7 @@ namespace MedAtlas.Sims
                 }
                 else txt = v == null ? "—" : v.ToString();
                 if (unit != "" && v is double) txt += " " + unit;
+                if (keyIdx < 4) { KeyVal[keyIdx] = txt; KeyBad[keyIdx] = bad; } keyIdx++;
                 sb.Append(bad ? "<color=#FFB347>" + txt + "</color>" : txt).Append('\n');
             }
             statsValues.text = sb.ToString();
@@ -691,7 +749,7 @@ namespace MedAtlas.Sims
         void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
         {
             if (visuals != null) visuals.Tick(now, paused ? 0 : dt);
-            if (micro != null) micro.Tick(now, paused ? 0 : dt);
+            if (mirror != null) mirror.Tick(paused ? 0 : dt);   // as on the web: update(playing ? dt : 0)
             if (journey != null) journey.Tick(now, paused ? 0 : dt);
             if (organ != null && organ.Loaded)
             {
