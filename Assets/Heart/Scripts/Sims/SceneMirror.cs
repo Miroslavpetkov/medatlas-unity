@@ -422,6 +422,7 @@ namespace MedAtlas.Sims
             foreach (var o in MiniJson.L(s.ContainsKey("texs") ? s["texs"] : null))
             {
                 var d = MiniJson.O(o); int id = I(d, "id"); liveT.Add(id);
+                texWrap[id] = (B(d, "ws") || I(d, "ws") == 1, B(d, "wt") || I(d, "wt") == 1);
                 if (!texs.ContainsKey(id)) LoadTex(id, I(d, "w"), I(d, "h"));
             }
             foreach (var o in MiniJson.L(s.ContainsKey("geoms") ? s["geoms"] : null))
@@ -432,7 +433,7 @@ namespace MedAtlas.Sims
             foreach (var o in MiniJson.L(s.ContainsKey("mats") ? s["mats"] : null))
             {
                 var d = MiniJson.O(o); int id = I(d, "id"); liveM.Add(id);
-                if (!mats.ContainsKey(id)) MakeMat(id, I(d, "t"), I(d, "tex"));
+                if (!mats.ContainsKey(id)) MakeMat(id, I(d, "t"), I(d, "tex"), d);
             }
             order.Clear();
             foreach (var o in MiniJson.L(s.ContainsKey("nodes") ? s["nodes"] : null))
@@ -451,8 +452,10 @@ namespace MedAtlas.Sims
         }
 
         static int I(D d, string k) => (int)MiniJson.D(d, k, 0);
+        static float F(object o) => o is double v ? (float)v : o is float f ? f : o is int n ? n : 0f;
         static bool B(D d, string k) => d != null && d.TryGetValue(k, out var v) && v is bool b && b;
 
+        readonly Dictionary<int, (bool s, bool t)> texWrap = new Dictionary<int, (bool s, bool t)>();
         byte[] texBuf = new byte[1 << 18];
         void LoadTex(int id, int w, int hgt)
         {
@@ -465,8 +468,9 @@ namespace MedAtlas.Sims
             {
                 if (t) Destroy(t);
                 t = new Texture2D(w, hgt, TextureFormat.RGBA32, false, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, anisoLevel = 2 };
+                if (texWrap.TryGetValue(id, out var wr)) { t.wrapModeU = wr.s ? TextureWrapMode.Repeat : TextureWrapMode.Clamp; t.wrapModeV = wr.t ? TextureWrapMode.Repeat : TextureWrapMode.Clamp; }
                 texs[id] = t;
-                foreach (var m in mats.Values) if (m.tex == id) m.m.SetTexture("_MainTex", t);
+                foreach (var m in mats.Values) if (m.tex == id) { m.m.SetTexture("_MainTex", t); if (m.type != M_SPRITE) m.m.SetFloat("_HasTex", 1); }
             }
             var data = t.GetPixelData<byte>(0);
             Unity.Collections.NativeArray<byte>.Copy(texBuf, data, need);
@@ -548,7 +552,7 @@ namespace MedAtlas.Sims
             if (tris) { if (g.normal != null) m.SetNormals(g.normal); else m.RecalculateNormals(); }
         }
 
-        void MakeMat(int id, int type, int tex)
+        void MakeMat(int id, int type, int tex, D d)
         {
             var mt = new Mat { id = id, type = type, tex = tex, flags = -1 };
             switch (type)
@@ -558,6 +562,17 @@ namespace MedAtlas.Sims
                 default:
                     mt.m = new Material(tplLit);
                     if (type != M_LIT) { mt.m.SetFloat("_Unlit", 1); mt.m.SetFloat("_Coat", 0); }
+                    if (tex != 0)
+                    {
+                        // texture on a mesh (three.js map): uv * repeat + offset, as in the web
+                        var tr = MiniJson.L(d != null && d.ContainsKey("tr") ? d["tr"] : null);
+                        if (tr != null && tr.Count == 4)
+                        {
+                            mt.m.SetTextureScale("_MainTex", new Vector2(F(tr[0]), F(tr[1])));
+                            mt.m.SetTextureOffset("_MainTex", new Vector2(F(tr[2]), F(tr[3])));
+                        }
+                        if (texs.TryGetValue(tex, out var lt)) { mt.m.SetTexture("_MainTex", lt); mt.m.SetFloat("_HasTex", 1); }
+                    }
                     break;
             }
             mt.m.name = "web" + id;

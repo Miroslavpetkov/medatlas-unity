@@ -376,9 +376,10 @@ export function mirrorStructure(h: number): string {
     if (!mats.has(mid)) {
       const t = mt.map;
       const tid = t ? idOf(m, t) : 0;
-      mats.set(mid, { id: mid, t: matType(mt), tex: tid });
+      // a lit surface's texture with its repeat / offset (e.g. the striations of the myofibril in the muscle section)
+      mats.set(mid, { id: mid, t: matType(mt), tex: tid, tr: t ? [t.repeat.x, t.repeat.y, t.offset.x, t.offset.y] : [1, 1, 0, 0] });
       if (t && !texs.has(tid)) {
-        texs.set(tid, { id: tid, w: t.image?.width ?? 0, h: t.image?.height ?? 0 });
+        texs.set(tid, { id: tid, w: t.image?.width ?? 0, h: t.image?.height ?? 0, ws: t.wrapS === 1000 ? 1 : 0, wt: t.wrapT === 1000 ? 1 : 0 });
         m.texs.set(tid, t);
       }
     }
