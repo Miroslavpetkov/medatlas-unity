@@ -144,6 +144,7 @@ namespace MedAtlas.Heart
             var vg = prof.Add<Vignette>(true); vg.intensity.Override(0.32f); vg.smoothness.Override(0.55f);
             var ca = prof.Add<ColorAdjustments>(true); ca.contrast.Override(8f); ca.saturation.Override(6f); ca.postExposure.Override(0.15f);
             vol.sharedProfile = prof;
+            QualityProfile.Boot();   // Low / Medium / High for this device (frame rate, render scale, bloom, levels of detail)
         }
 
         public static Cubemap StudioCubemap()

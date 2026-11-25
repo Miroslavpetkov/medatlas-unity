@@ -161,6 +161,13 @@ namespace MedAtlas.Sims
         public void Tick(float dt)
         {
             if (!Ok) return;
+            if (cam)
+            {
+                // the camera in the web scene's coordinates (this object is the web world scaled by S, z mirrored):
+                // the heavy meshes (skin, brain) choose their level of detail from it, as in the web viewer
+                var lp = transform.InverseTransformPoint(cam.transform.position);
+                PhysioBridge.SceneCam(h, lp.x, lp.y, -lp.z);
+            }
             int len = PhysioBridge.SceneFrame(h, dt);
             if (len <= 0) return;
             if (len > frame.Length) frame = new float[Mathf.NextPowerOfTwo(len)];
