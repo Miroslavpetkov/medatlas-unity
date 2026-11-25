@@ -36,6 +36,9 @@ namespace MedAtlas.Sims
         [DllImport("__Internal")] static extern void MedPhysio_View2dRect(float x, float y, float w, float h);
         [DllImport("__Internal")] static extern void MedPhysio_View2dFrame(int h, float dt, int playing);
         [DllImport("__Internal")] static extern void MedPhysio_View2dClose();
+        [DllImport("__Internal")] static extern int MedPhysio_View2dPoll();
+        [DllImport("__Internal")] static extern int MedPhysio_Muscle2dOpen();
+        [DllImport("__Internal")] static extern void MedPhysio_Muscle2dFrame(float dt);
         [DllImport("__Internal")] static extern int MedPhysio_MuscleOpen(string tab, int phone);
         [DllImport("__Internal")] static extern int MedPhysio_MuscleAct(string cmd, string arg, int phone);
         [DllImport("__Internal")] static extern IntPtr MedPhysio_MuscleView();
@@ -75,6 +78,10 @@ namespace MedAtlas.Sims
         public static void View2dRect(float x, float y, float w, float h) => MedPhysio_View2dRect(x, y, w, h);
         public static void View2dFrame(int h, float dt, bool playing) => MedPhysio_View2dFrame(h, dt, playing ? 1 : 0);
         public static void View2dClose() => MedPhysio_View2dClose();
+        /// <summary>True once after the student pressed "3D сцена" on the 2D layer.</summary>
+        public static bool View2dPoll() => MedPhysio_View2dPoll() == 1;
+        public static bool Muscle2dOpen() => MedPhysio_Muscle2dOpen() == 1;
+        public static void Muscle2dFrame(float dt) => MedPhysio_Muscle2dFrame(dt);
         // muscle section (MuscleApp.cs)
         public static int MuscleOpen(string tab, bool phone) => MedPhysio_MuscleOpen(tab ?? "", phone ? 1 : 0);
         public static int MuscleAct(string cmd, string arg, bool phone) => MedPhysio_MuscleAct(cmd, arg ?? "", phone ? 1 : 0);
@@ -108,6 +115,9 @@ namespace MedAtlas.Sims
         public static void View2dRect(float x, float y, float w, float h) { }
         public static void View2dFrame(int h, float dt, bool playing) { }
         public static void View2dClose() { }
+        public static bool View2dPoll() => false;
+        public static bool Muscle2dOpen() => false;
+        public static void Muscle2dFrame(float dt) { }
         public static int MuscleOpen(string tab, bool phone) => -1;
         public static int MuscleAct(string cmd, string arg, bool phone) => -1;
         public static string MuscleView() => "{}";

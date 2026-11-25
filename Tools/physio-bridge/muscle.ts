@@ -120,6 +120,22 @@ export function muscleAct(cmd: string, arg: string, phone: number): number {
   return handle;
 }
 
+/** The physiology model behind the 2D diagram (web screen.ts id2d): skeletal → 'muscle', smooth → 'smooth'. */
+export const muscle2dId = (): string => (tab.group === 'smooth' ? 'smooth' : 'muscle');
+
+/** The section's own controls drive the model (web screen.ts drive2D): length, contract / relax, motor drive, the
+ *  smooth pathway. Changes v in place; returns the step the diagram shows (-1 = all), from the section's step card. */
+export function muscle2dDrive(id: string, v: Record<string, number>): number {
+  if (id === 'muscle') {
+    if (tab.id === 'sarcomere' || tab.id === 'graph') v.len = st.len;
+    v.freq = tab.id === 'sarcomere' ? (st.contract ? 60 : 0) : tab.id === 'units' ? Math.round(st.drive * 50) : 2;
+  } else {
+    v.agonist = st.smoothMode === 'contract' ? 0.8 : 0;
+  }
+  const steps = stepsOf(tab);
+  return steps && (tab.id === 'ecc' || tab.id === 'smooth-path') ? st.step : -1;
+}
+
 function goStep(i: number): void {
   const steps = stepsOf(tab);
   if (!steps) return;

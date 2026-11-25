@@ -26,6 +26,8 @@ const CSS = `
 #u2d .p2d-steps b { font-size: 15px; padding: 0 4px; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #u2d .u2d-tip { position: absolute; max-width: min(340px, 80%); background: #0b1220f2; border: 1px solid #ffffff2a; border-radius: 12px; padding: 10px 12px;
   font-size: 15px; line-height: 1.35; pointer-events: none; box-shadow: 0 8px 24px #0008; }
+#u2d .u2d-back { position: absolute; top: 8px; right: 8px; z-index: 3; min-width: 44px; min-height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; font-family: inherit;
+  border-radius: 999px; border: 1px solid #ffe07a80; background: #0b1220e6; color: #ffe07a; cursor: pointer; box-shadow: 0 4px 14px #0007; }
 #u2d .u2d-tip i { color: #aab3c5; }
 #u2d .u2d-tip span { color: #aab3c5; }
 `;
@@ -37,6 +39,7 @@ let open = -1;      // the instance shown
 let pending = 0;    // a view module is loading
 let step = -1;
 let tipTimer = 0;
+let backReq = 0;    // the student pressed "3D" on the layer; Unity polls it
 
 function ensureBox(): HTMLDivElement {
   if (box) return box;
@@ -50,6 +53,7 @@ function ensureBox(): HTMLDivElement {
   box.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest('[data-p2dstep]') as HTMLElement | null;
     if (b) setStep(Number(b.dataset.p2dstep));
+    if ((e.target as HTMLElement).closest('[data-u2dback]')) backReq = 1;
   });
   return box;
 }
@@ -86,11 +90,12 @@ export function view2dHas(id: string): number {
   return id in VIEWS_2D ? 1 : 0;
 }
 
-/** Show the 2D view of instance h (s = the bridge's record of it: model, instance, values) over the 3D area. */
-export function view2dOpen(h: number, s: any, actFn: (id: string) => void): number {
+/** Show the 2D view of instance h (s = the bridge's record of it: model, instance, values) over the 3D area.
+ *  ownSteps = false when the screen drives the view's steps itself (the muscle section, view2dStep). */
+export function view2dOpen(h: number, s: any, actFn: (id: string) => void, ownSteps = true): number {
   if (!s || !(s.m.id in VIEWS_2D)) return 0;
   const b = ensureBox();
-  if (open === h && host) { b.classList.remove('hidden'); return 1; }
+  if (open === h) { if (host) b.classList.remove('hidden'); return 1; }   // shown, or still loading
   view2dClose();
   open = h;
   const ticket = ++pending;
@@ -111,9 +116,15 @@ export function view2dOpen(h: number, s: any, actFn: (id: string) => void): numb
     const foot = document.createElement('div');
     foot.className = 'p2d-foot';
     foot.innerHTML = `<span class="p2d-ref">📖 ${esc(bg(view.textbookRef))}</span>${
-      view.steps?.length ? `<span class="p2d-steps"><button data-p2dstep="-1" aria-label="Предишна стъпка">‹</button><b id="u2d-step">Стъпки</b><button data-p2dstep="1" aria-label="Следваща стъпка">›</button></span>` : ''
+      ownSteps && view.steps?.length ? `<span class="p2d-steps"><button data-p2dstep="-1" aria-label="Предишна стъпка">‹</button><b id="u2d-step">Стъпки</b><button data-p2dstep="1" aria-label="Следваща стъпка">›</button></span>` : ''
     }`;
     b.appendChild(foot);
+    const back = document.createElement('button');
+    back.className = 'u2d-back';
+    back.dataset.u2dback = '1';
+    back.textContent = '3D сцена';
+    back.setAttribute('aria-label', 'Обратно към 3D сцената');
+    b.appendChild(back);
     b.classList.remove('hidden');
     host.resize();
   });
@@ -140,7 +151,25 @@ export function view2dFrame(h: number, s: any, dt: number, playing: number): voi
   host.update({ model: s.m, inst: s.inst, values: s.v, t: s.inst.t, playing: !!playing }, dt);
 }
 
+/** 1 once after the student pressed "3D сцена" on the layer. */
+export function view2dPoll(): number {
+  const r = backReq;
+  backReq = 0;
+  return r;
+}
+
+/** The screen sets the view's step (-1 = all), e.g. the muscle section's step card. */
+export function view2dStep(i: number): void {
+  const v = host?.view;
+  if (!v?.setStep || !v.steps?.length) return;
+  const k = Math.max(-1, Math.min(v.steps.length - 1, i));
+  if (k === step) return;
+  step = k;
+  v.setStep(k);
+}
+
 export function view2dClose(): void {
+  backReq = 0;
   pending++;
   host?.destroy();
   host = null;
