@@ -299,7 +299,7 @@ namespace MedAtlas.Sims
             for (int i = 0; i < n; i++, p += 3) pos[i] = new Vector3(f[p], f[p + 1], f[p + 2]);
             Vector3[] nrm = null; Color[] col = null;
             if ((fl & 2) != 0) { nrm = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) nrm[i] = new Vector3(f[p], f[p + 1], f[p + 2]); }
-            if ((fl & 4) != 0) { col = new Color[n]; for (int i = 0; i < n; i++, p += 3) col[i] = new Color(f[p], f[p + 1], f[p + 2], 1).linear; }
+            if ((fl & 4) != 0) { col = new Color[n]; for (int i = 0; i < n; i++, p += 3) col[i] = new Color(f[p], f[p + 1], f[p + 2], 1); }
             if (g == null) return p;
             g.pos = pos; if (nrm != null) g.normal = nrm; if (col != null) g.cols = col;
             if (rebuild)
@@ -475,7 +475,7 @@ namespace MedAtlas.Sims
             g.pos = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) g.pos[i] = new Vector3(f[p], f[p + 1], f[p + 2]);
             if (g.nrm) { g.normal = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) g.normal[i] = new Vector3(f[p], f[p + 1], f[p + 2]); }
             if (g.uv) { g.uvs = new Vector2[n]; for (int i = 0; i < n; i++, p += 2) g.uvs[i] = new Vector2(f[p], f[p + 1]); }
-            if (g.col) { g.cols = new Color[n]; for (int i = 0; i < n; i++, p += 3) g.cols[i] = new Color(f[p], f[p + 1], f[p + 2], 1).linear; }
+            if (g.col) { g.cols = new Color[n]; for (int i = 0; i < n; i++, p += 3) g.cols[i] = new Color(f[p], f[p + 1], f[p + 2], 1); }
             geos[g.id] = g;
         }
 
