@@ -9,6 +9,8 @@ Shader "MedAtlas/MirrorLit"
     Properties
     {
         _Color ("Color", Color) = (1, 1, 1, 1)
+        _MainTex ("Texture (three.js map)", 2D) = "white" {}
+        _HasTex ("Use texture", Float) = 0
         _Emission ("Emission", Color) = (0, 0, 0, 1)
         _Opacity ("Opacity", Float) = 1
         _Rough ("Roughness", Float) = 0.55
@@ -43,7 +45,9 @@ Shader "MedAtlas/MirrorLit"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "MirrorCommon.hlsl"
 
+            TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
             CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
                 half4 _Color;
                 half4 _Emission;
                 half _Opacity;
@@ -54,6 +58,7 @@ Shader "MedAtlas/MirrorLit"
                 half _UseInst;
                 half _Coat;
                 half _ToneMap;
+                half _HasTex;
             CBUFFER_END
 
             UNITY_INSTANCING_BUFFER_START(Props)
@@ -65,6 +70,7 @@ Shader "MedAtlas/MirrorLit"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float4 color : COLOR;
+                float2 uv : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
             struct Varyings
@@ -73,6 +79,7 @@ Shader "MedAtlas/MirrorLit"
                 float3 normalWS : TEXCOORD0;
                 float3 positionWS : TEXCOORD1;
                 half4 color : COLOR;
+                float2 uv : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -91,6 +98,7 @@ Shader "MedAtlas/MirrorLit"
                 if (_UseInst > 0.5h) c.rgb *= UNITY_ACCESS_INSTANCED_PROP(Props, _InstColor).rgb;
                 #endif
                 o.color = c;
+                o.uv = v.uv * _MainTex_ST.xy + _MainTex_ST.zw;
                 return o;
             }
 
@@ -98,6 +106,7 @@ Shader "MedAtlas/MirrorLit"
             {
                 UNITY_SETUP_INSTANCE_ID(i);
                 half3 albedo = _Color.rgb * i.color.rgb;
+                if (_HasTex > 0.5h) albedo *= SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv).rgb;
                 half3 col;
                 if (_Unlit > 0.5h) col = albedo;
                 else

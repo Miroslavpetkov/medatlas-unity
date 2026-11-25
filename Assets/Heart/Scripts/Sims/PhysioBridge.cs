@@ -28,6 +28,13 @@ namespace MedAtlas.Sims
         [DllImport("__Internal")] static extern int MedPhysio_SceneTex(int h, int tid, byte[] dst, int cap);
         [DllImport("__Internal")] static extern IntPtr MedPhysio_SceneFit(int h, float aspect, float fov);
 
+        [DllImport("__Internal")] static extern int MedPhysio_MuscleOpen(string tab, int phone);
+        [DllImport("__Internal")] static extern int MedPhysio_MuscleAct(string cmd, string arg, int phone);
+        [DllImport("__Internal")] static extern IntPtr MedPhysio_MuscleView();
+        [DllImport("__Internal")] static extern IntPtr MedPhysio_MusclePart(string id);
+        [DllImport("__Internal")] static extern int MedPhysio_MuscleChart(string kind, int w, int h, byte[] dst, int cap);
+        [DllImport("__Internal")] static extern float MedPhysio_MuscleChartLen(float x, int w);
+
         static string Take(IntPtr p) { var s = Marshal.PtrToStringUTF8(p); MedPhysio_Free(p); return s; }
 
         public static bool Available => MedPhysio_Ready() == 1;
@@ -48,6 +55,13 @@ namespace MedAtlas.Sims
         public static int SceneIndex(int h, int gid, bool tri, int[] dst) => MedPhysio_SceneIndex(h, gid, tri ? 1 : 0, dst, dst.Length);
         public static int SceneTex(int h, int tid, byte[] dst) => MedPhysio_SceneTex(h, tid, dst, dst.Length);
         public static string SceneFit(int h, float aspect, float fov) => Take(MedPhysio_SceneFit(h, aspect, fov));
+        // muscle section (MuscleApp.cs)
+        public static int MuscleOpen(string tab, bool phone) => MedPhysio_MuscleOpen(tab ?? "", phone ? 1 : 0);
+        public static int MuscleAct(string cmd, string arg, bool phone) => MedPhysio_MuscleAct(cmd, arg ?? "", phone ? 1 : 0);
+        public static string MuscleView() => Take(MedPhysio_MuscleView());
+        public static string MusclePart(string id) => Take(MedPhysio_MusclePart(id));
+        public static int MuscleChart(string kind, int w, int h, byte[] dst) => MedPhysio_MuscleChart(kind, w, h, dst, dst.Length);
+        public static float MuscleChartLen(float x, int w) => MedPhysio_MuscleChartLen(x, w);
 #else
         public static bool Available => false;
         public static string List() => "[]";
@@ -66,6 +80,12 @@ namespace MedAtlas.Sims
         public static int SceneIndex(int h, int gid, bool tri, int[] dst) => 0;
         public static int SceneTex(int h, int tid, byte[] dst) => 0;
         public static string SceneFit(int h, float aspect, float fov) => "[]";
+        public static int MuscleOpen(string tab, bool phone) => -1;
+        public static int MuscleAct(string cmd, string arg, bool phone) => -1;
+        public static string MuscleView() => "{}";
+        public static string MusclePart(string id) => "null";
+        public static int MuscleChart(string kind, int w, int h, byte[] dst) => 0;
+        public static float MuscleChartLen(float x, int w) => 2.1f;
 #endif
     }
 }

@@ -1,6 +1,7 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
 import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
+import { muscleOpen, muscleAct, muscleView, musclePart, muscleChart, muscleChartLen } from './muscle';
 import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit } from './mirror';
 
 // The web scenes load real anatomy (real/<topic>.bin, body/…) with relative URLs. The Unity page lives on another
@@ -112,6 +113,13 @@ const api = {
   sceneIndex: (h: number, gid: number, tri: number) => mirrorIndex(h, gid, !!tri),
   sceneTex: (h: number, tid: number) => mirrorTex(h, tid),
   sceneFit: (h: number, aspect: number, fov: number) => mirrorFit(h, aspect, fov),
+  // the muscle section (#muscle on the web): its scene is mirrored under the returned handle
+  muscleOpen: (tab: string, phone: number) => muscleOpen(tab, phone),
+  muscleAct: (cmd: string, arg: string, phone: number) => muscleAct(cmd, arg, phone),
+  muscleView: () => muscleView(),
+  musclePart: (id: string) => musclePart(id),
+  muscleChart: (kind: string, w: number, h: number) => muscleChart(kind, w, h),
+  muscleChartLen: (x: number, w: number) => muscleChartLen(x, w),
   curve: (h: number, i: number) => { const s = insts[h]; const x = s.m.xy[i]; return JSON.stringify(x.curve ? x.curve(s.v) : []); },
 };
 (globalThis as any).MedPhysio = api;

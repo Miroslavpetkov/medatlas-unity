@@ -19,6 +19,8 @@ namespace MedAtlas.Sims
         public const float S = 0.02f;
         /// <summary>The web camera looks from (0.35, 0.25, 1): as Unity orbit angles.</summary>
         public const float WebYaw = -19.29f, WebPitch = 13.28f;
+        /// <summary>This scene's web look direction as orbit angles (set by Fit; flat diagrams are seen straight on).</summary>
+        public float Yaw = WebYaw, Pitch = WebPitch;
 
         const int K_MESH = 0, K_INST = 1, K_POINTS = 2, K_LINES = 3, K_STRIP = 4, K_LOOP = 5, K_SPRITE = 6;
         const int M_LIT = 0, M_BASIC = 1, M_POINTS = 2, M_LINE = 3, M_SPRITE = 4;
@@ -56,13 +58,15 @@ namespace MedAtlas.Sims
         Mesh quad;
         Camera cam;
 
-        public static SceneMirror Create(int handle, Camera cam)
+        /// <summary>Mirror the web scene of model instance `handle`; `prebuilt` when the page already built it under that
+        /// handle (the muscle section).</summary>
+        public static SceneMirror Create(int handle, Camera cam, bool prebuilt = false)
         {
             var go = new GameObject("WebScene");
             var m = go.AddComponent<SceneMirror>();
             m.h = handle; m.cam = cam;
             go.transform.localScale = Vector3.one * S;
-            var res = MiniJson.O(MiniJson.Parse(PhysioBridge.SceneBuild(handle) ?? "{}"));
+            var res = MiniJson.O(MiniJson.Parse(prebuilt ? "{\"ok\":true}" : PhysioBridge.SceneBuild(handle) ?? "{}"));
             m.Ok = res != null && res.TryGetValue("ok", out var ok) && ok is bool b && b;
             m.Error = res != null ? MiniJson.S(res, "err") : "no bridge";
             if (!m.Ok) { Debug.LogWarning("SceneMirror: " + m.Error); Destroy(go); return null; }
@@ -104,13 +108,13 @@ namespace MedAtlas.Sims
         /// <summary>The web viewer's lights (viewer.ts), as shader globals.</summary>
         static void SetLights()
         {
-            Shader.SetGlobalVector("_MirKeyDir", Dir(120, 200, 160)); Shader.SetGlobalVector("_MirKeyCol", Lin(0xfff3e8, 2.1f));
+            Shader.SetGlobalVector("_MirKeyDir", Dir(120, 200, 160)); Shader.SetGlobalVector("_MirKeyCol", Lin(0xfff3e8, 1.7f));
             Shader.SetGlobalVector("_MirFillDir", Dir(-200, -40, -120)); Shader.SetGlobalVector("_MirFillCol", Lin(0x9fc3ff, 0.55f));
             Shader.SetGlobalVector("_MirRimDir", Dir(-80, 60, -200)); Shader.SetGlobalVector("_MirRimCol", Lin(0xbfd4ff, 0.9f));
             Shader.SetGlobalVector("_MirCamCol", Lin(0xffffff, 0.3f));
             Shader.SetGlobalVector("_MirSky", Lin(0xdce9ff, 0.85f)); Shader.SetGlobalVector("_MirGround", Lin(0x2a1d26, 0.85f));
             // x: environment intensity (web 0.55), y: exposure (web 1.15), z: soft tissue rim
-            Shader.SetGlobalVector("_MirEnv", new Vector4(0.55f, 1.15f, 0.08f, 0));
+            Shader.SetGlobalVector("_MirEnv", new Vector4(0.42f, 0.9f, 0.08f, 0));   // side-by-side QA: web 0.55/1.15 read clearly brighter and warmer here
             var fog = Lin(0x0a1020, 1f); fog.w = 0.0012f / S;   // FogExp2 density per Unity unit
             Shader.SetGlobalVector("_MirFogCol", fog);
         }
@@ -138,11 +142,18 @@ namespace MedAtlas.Sims
             if (a.Count < 4) return false;
             target = new Vector3((float)MiniJson.Num(a[0]), (float)MiniJson.Num(a[1]), (float)MiniJson.Num(a[2])) * S;
             dist = (float)MiniJson.Num(a[3]) * S;
+            if (a.Count >= 7)
+            {
+                // the web look direction (target -> camera) as orbit angles: the camera looks along its opposite
+                var f = -new Vector3((float)MiniJson.Num(a[4]), (float)MiniJson.Num(a[5]), (float)MiniJson.Num(a[6])).normalized;
+                Yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                Pitch = Mathf.Asin(Mathf.Clamp(-f.y, -1f, 1f)) * Mathf.Rad2Deg;
+            }
             return dist > 0;
         }
 
         /// <summary>True for a few seconds after the scene was built (real anatomy is still arriving).</summary>
-        public bool Settling => Time.unscaledTime - builtAt < 6f;
+        public bool Settling => Time.unscaledTime - builtAt < 25f;   // body anatomy can take well over 6 s on a slow machine
 
         // ------------------------------------------------------------------ frame
 
@@ -299,7 +310,7 @@ namespace MedAtlas.Sims
             for (int i = 0; i < n; i++, p += 3) pos[i] = new Vector3(f[p], f[p + 1], f[p + 2]);
             Vector3[] nrm = null; Color[] col = null;
             if ((fl & 2) != 0) { nrm = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) nrm[i] = new Vector3(f[p], f[p + 1], f[p + 2]); }
-            if ((fl & 4) != 0) { col = new Color[n]; for (int i = 0; i < n; i++, p += 3) col[i] = new Color(f[p], f[p + 1], f[p + 2], 1).linear; }
+            if ((fl & 4) != 0) { col = new Color[n]; for (int i = 0; i < n; i++, p += 3) col[i] = new Color(f[p], f[p + 1], f[p + 2], 1); }
             if (g == null) return p;
             g.pos = pos; if (nrm != null) g.normal = nrm; if (col != null) g.cols = col;
             if (rebuild)
@@ -411,6 +422,7 @@ namespace MedAtlas.Sims
             foreach (var o in MiniJson.L(s.ContainsKey("texs") ? s["texs"] : null))
             {
                 var d = MiniJson.O(o); int id = I(d, "id"); liveT.Add(id);
+                texWrap[id] = (B(d, "ws") || I(d, "ws") == 1, B(d, "wt") || I(d, "wt") == 1);
                 if (!texs.ContainsKey(id)) LoadTex(id, I(d, "w"), I(d, "h"));
             }
             foreach (var o in MiniJson.L(s.ContainsKey("geoms") ? s["geoms"] : null))
@@ -421,7 +433,7 @@ namespace MedAtlas.Sims
             foreach (var o in MiniJson.L(s.ContainsKey("mats") ? s["mats"] : null))
             {
                 var d = MiniJson.O(o); int id = I(d, "id"); liveM.Add(id);
-                if (!mats.ContainsKey(id)) MakeMat(id, I(d, "t"), I(d, "tex"));
+                if (!mats.ContainsKey(id)) MakeMat(id, I(d, "t"), I(d, "tex"), d);
             }
             order.Clear();
             foreach (var o in MiniJson.L(s.ContainsKey("nodes") ? s["nodes"] : null))
@@ -440,8 +452,10 @@ namespace MedAtlas.Sims
         }
 
         static int I(D d, string k) => (int)MiniJson.D(d, k, 0);
+        static float F(object o) => o is double v ? (float)v : o is float f ? f : o is int n ? n : 0f;
         static bool B(D d, string k) => d != null && d.TryGetValue(k, out var v) && v is bool b && b;
 
+        readonly Dictionary<int, (bool s, bool t)> texWrap = new Dictionary<int, (bool s, bool t)>();
         byte[] texBuf = new byte[1 << 18];
         void LoadTex(int id, int w, int hgt)
         {
@@ -454,8 +468,9 @@ namespace MedAtlas.Sims
             {
                 if (t) Destroy(t);
                 t = new Texture2D(w, hgt, TextureFormat.RGBA32, false, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear, anisoLevel = 2 };
+                if (texWrap.TryGetValue(id, out var wr)) { t.wrapModeU = wr.s ? TextureWrapMode.Repeat : TextureWrapMode.Clamp; t.wrapModeV = wr.t ? TextureWrapMode.Repeat : TextureWrapMode.Clamp; }
                 texs[id] = t;
-                foreach (var m in mats.Values) if (m.tex == id) m.m.SetTexture("_MainTex", t);
+                foreach (var m in mats.Values) if (m.tex == id) { m.m.SetTexture("_MainTex", t); if (m.type != M_SPRITE) m.m.SetFloat("_HasTex", 1); }
             }
             var data = t.GetPixelData<byte>(0);
             Unity.Collections.NativeArray<byte>.Copy(texBuf, data, need);
@@ -475,7 +490,7 @@ namespace MedAtlas.Sims
             g.pos = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) g.pos[i] = new Vector3(f[p], f[p + 1], f[p + 2]);
             if (g.nrm) { g.normal = new Vector3[n]; for (int i = 0; i < n; i++, p += 3) g.normal[i] = new Vector3(f[p], f[p + 1], f[p + 2]); }
             if (g.uv) { g.uvs = new Vector2[n]; for (int i = 0; i < n; i++, p += 2) g.uvs[i] = new Vector2(f[p], f[p + 1]); }
-            if (g.col) { g.cols = new Color[n]; for (int i = 0; i < n; i++, p += 3) g.cols[i] = new Color(f[p], f[p + 1], f[p + 2], 1).linear; }
+            if (g.col) { g.cols = new Color[n]; for (int i = 0; i < n; i++, p += 3) g.cols[i] = new Color(f[p], f[p + 1], f[p + 2], 1); }
             geos[g.id] = g;
         }
 
@@ -537,7 +552,7 @@ namespace MedAtlas.Sims
             if (tris) { if (g.normal != null) m.SetNormals(g.normal); else m.RecalculateNormals(); }
         }
 
-        void MakeMat(int id, int type, int tex)
+        void MakeMat(int id, int type, int tex, D d)
         {
             var mt = new Mat { id = id, type = type, tex = tex, flags = -1 };
             switch (type)
@@ -547,6 +562,17 @@ namespace MedAtlas.Sims
                 default:
                     mt.m = new Material(tplLit);
                     if (type != M_LIT) { mt.m.SetFloat("_Unlit", 1); mt.m.SetFloat("_Coat", 0); }
+                    if (tex != 0)
+                    {
+                        // texture on a mesh (three.js map): uv * repeat + offset, as in the web
+                        var tr = MiniJson.L(d != null && d.ContainsKey("tr") ? d["tr"] : null);
+                        if (tr != null && tr.Count == 4)
+                        {
+                            mt.m.SetTextureScale("_MainTex", new Vector2(F(tr[0]), F(tr[1])));
+                            mt.m.SetTextureOffset("_MainTex", new Vector2(F(tr[2]), F(tr[3])));
+                        }
+                        if (texs.TryGetValue(tex, out var lt)) { mt.m.SetTexture("_MainTex", lt); mt.m.SetFloat("_HasTex", 1); }
+                    }
                     break;
             }
             mt.m.name = "web" + id;

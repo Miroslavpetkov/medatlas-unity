@@ -60,6 +60,27 @@ mergeInto(LibraryManager.library, {
   MedPhysio_SceneFit: function (h, aspect, fov) {
     return stringToNewUTF8(window.MedPhysio.sceneFit(h, aspect, fov));
   },
+  // ---- muscle section (Tools/physio-bridge/muscle.ts)
+  MedPhysio_MuscleOpen: function (tab, phone) {
+    return window.MedPhysio.muscleOpen(UTF8ToString(tab), phone);
+  },
+  MedPhysio_MuscleAct: function (cmd, arg, phone) {
+    return window.MedPhysio.muscleAct(UTF8ToString(cmd), UTF8ToString(arg), phone);
+  },
+  MedPhysio_MuscleView: function () {
+    return stringToNewUTF8(window.MedPhysio.muscleView());
+  },
+  MedPhysio_MusclePart: function (id) {
+    return stringToNewUTF8(window.MedPhysio.musclePart(UTF8ToString(id)));
+  },
+  MedPhysio_MuscleChart: function (kind, w, h, dst, cap) {
+    var f = window.MedPhysio.muscleChart(UTF8ToString(kind), w, h);
+    if (f.length <= cap) HEAPU8.set(f, dst);
+    return f.length;
+  },
+  MedPhysio_MuscleChartLen: function (x, w) {
+    return window.MedPhysio.muscleChartLen(x, w);
+  },
   MedPhysio_Free: function (p) {
     _free(p);
   }
