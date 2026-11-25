@@ -67,6 +67,14 @@ namespace MedAtlas.Sims
         /// <summary>The part card (the tools bar sits under it).</summary>
         public RectTransform Card => card;
 
+        /// <summary>Landscape: x of the card's centre on the canvas (the free 3D area between the side panels), not the screen centre.</summary>
+        public System.Func<float> CenterX;
+        /// <summary>Landscape: width of that free area (the tools bar is scaled down to fit it).</summary>
+        public System.Func<float> FreeWidth;
+
+        /// <summary>The name on the card of the last tapped part.</summary>
+        public string Title => title != null ? title.text : "";
+
         /// <summary>Parts (object names) that are picked by their box, label included, not only by their triangles:
         /// small targets such as the thin auscultation rings, which a tap in the ring's middle would otherwise miss
         /// (the web picks them by the ring and its letter label).</summary>
@@ -213,7 +221,7 @@ namespace MedAtlas.Sims
             // portrait phones scale the 1920-wide canvas down a lot: bigger type, and the card sits below the title
             bool portrait = Screen.height > Screen.width;
             title.fontSize = portrait ? 38 : 26; latin.fontSize = portrait ? 26 : 17; body.fontSize = portrait ? 27 : 17;
-            card.anchoredPosition = new Vector2(0, portrait ? -210 : -120);
+            card.anchoredPosition = new Vector2(portrait || CenterX == null ? 0 : CenterX(), portrait ? -210 : -120);
             // size the card to its text and keep it inside the screen width
             var crt = (RectTransform)canvas;
             float w = Mathf.Min(720f, crt.rect.width - 32f);

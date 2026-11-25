@@ -42,7 +42,7 @@ namespace MedAtlas.Sims
             UIKit.PanelImage(bar, new Color(11 / 255f, 18 / 255f, 32 / 255f, 0.85f));
             barTitle = UIKit.LabelAt(bar, "", 17, UIKit.TextMain, new Vector2(16, -20), new Vector2(150, 26), UIKit.SemiBold);
             float x = 170;
-            foreach (var (label, cmd, w) in new[] { ("Скрий", "hide", 92f), ("Полупрозрачен", "fade", 170f), ("Изолирай", "iso", 118f), ("Фокус", "focus", 92f), ("Покажи всичко", "all", 168f), ("✕", "close", 52f) })
+            foreach (var (label, cmd, w) in new[] { ("Скрий", "hide", 92f), ("Полупрозрачен", "fade", 170f), ("Изолирай", "iso", 118f), ("Фокус", "focus", 92f), ("Покажи всичко", "all", 168f), ("×", "close", 52f) })
             {
                 var c = cmd;
                 var b = UIKit.Button(bar, label, new Vector2(x, 0), new Vector2(w, 48), () => BarCmd(c), 16);
@@ -150,7 +150,7 @@ namespace MedAtlas.Sims
         void Picked(Renderer r, bool twice)
         {
             if (r == null || r.GetComponentInParent<SceneMirror>() != mirror) { HideBar(); return; }
-            partId = r.gameObject.name; partR = r;
+            partId = r.gameObject.name; partR = r; partName = picker.Title;
             if (twice) Focus();
             ShowBar();
         }
@@ -159,24 +159,40 @@ namespace MedAtlas.Sims
         {
             string mode = PhysioBridge.SceneTool(h, "modeOf", partId) ?? "show";
             bool changed = PhysioBridge.SceneTool(h, "changed", "") == "1";
-            barTitle.text = picker.Card != null && picker.Card.gameObject.activeSelf ? "" : partId;
+            barTitle.text = picker.Card != null && picker.Card.gameObject.activeSelf ? "" : (string.IsNullOrEmpty(partName) ? partId : partName);
             foreach (var (b, cmd) in barBtns)
             {
                 b.On = (cmd == "hide" && mode == "hide") || (cmd == "fade" && mode == "fade") || (cmd == "iso" && mode == "isolate");
                 if (cmd == "all") b.Button.gameObject.SetActive(changed);
             }
             bar.gameObject.SetActive(true); bar.SetAsLastSibling();
-            Place();
+            LayoutBar(); Place();
+        }
+
+        // only the buttons that are shown, packed from the left; the bar is as wide as they are
+        void LayoutBar()
+        {
+            float x = string.IsNullOrEmpty(barTitle.text) ? 10 : 170;
+            barTitle.gameObject.SetActive(!string.IsNullOrEmpty(barTitle.text));
+            foreach (var (b, _) in barBtns)
+            {
+                if (!b.Button.gameObject.activeSelf) continue;
+                var rt = b.Button.GetComponent<RectTransform>();
+                rt.anchoredPosition = new Vector2(x, rt.anchoredPosition.y);
+                x += rt.sizeDelta.x + 6;
+            }
+            bar.sizeDelta = new Vector2(x + 4, 64);
         }
 
         void HideBar()
         {
+            lastBarY = null;
             // keep "Покажи всичко" reachable while something is hidden or faded
             if (PhysioBridge.SceneTool(h, "changed", "") == "1")
             {
                 partId = ""; barTitle.text = "";
                 foreach (var (b, cmd) in barBtns) { b.Button.gameObject.SetActive(cmd == "all" || cmd == "close"); b.On = false; }
-                bar.gameObject.SetActive(true); Place();
+                bar.gameObject.SetActive(true); LayoutBar(); Place();
             }
             else bar.gameObject.SetActive(false);
         }
@@ -184,6 +200,7 @@ namespace MedAtlas.Sims
         void BarCmd(string cmd)
         {
             Haptics.Tick();
+            if (cmd == "close" || cmd == "all") lastBarY = null;
             if (cmd == "close") { foreach (var (b, _) in barBtns) b.Button.gameObject.SetActive(true); bar.gameObject.SetActive(false); picker.Hide(); return; }
             if (cmd == "all") { PhysioBridge.SceneTool(h, "all", ""); foreach (var (b, _) in barBtns) b.Button.gameObject.SetActive(true); bar.gameObject.SetActive(false); picker.Hide(); return; }
             if (partId == "") return;
@@ -204,21 +221,44 @@ namespace MedAtlas.Sims
 
         void Place()
         {
-            // right under the part card (its height follows the text), centred
-            float y = -340;
+            // right under the part card (its height follows the text), centred over the 3D view; when the card closes
+            // (the part was hidden or rebuilt) the bar stays where it was, so the next button is still under the finger
+            float y = lastBarY ?? -340;
             var c = picker.Card;
             if (c != null && c.gameObject.activeSelf) y = c.anchoredPosition.y - c.sizeDelta.y - 12;
-            bar.anchoredPosition = new Vector2(0, y);
+            lastBarY = y;
+            bar.anchoredPosition = new Vector2(Portrait || picker.CenterX == null ? 0 : picker.CenterX(), y);
             float scale = Portrait ? 1.35f : 1f;   // portrait phones scale the 1920-wide canvas down a lot
-            bar.localScale = Vector3.one * Mathf.Min(scale, (((RectTransform)canvas).rect.width - 24) / Mathf.Max(1, bar.sizeDelta.x));
+            float room = Portrait || picker.FreeWidth == null ? ((RectTransform)canvas).rect.width - 24 : picker.FreeWidth();
+            bar.localScale = Vector3.one * Mathf.Min(scale, room / Mathf.Max(1, bar.sizeDelta.x));
         }
 
         void Update()
         {
             if (planeOn) ApplyPlane();
             if (bar.gameObject.activeSelf) Place();
-            float k = Portrait ? 1.3f : 1f;
+            bool portrait = Portrait;
+            float k = portrait ? 1.3f : 1f;
             toolBtn.localScale = panel.localScale = Vector3.one * k;
+            if (portrait != lastPortrait) { lastPortrait = portrait; PlaceTools(portrait); }
+        }
+
+        bool? lastPortrait; float? lastBarY; string partName = "";
+
+        // phone held upright: right edge of the 3D view; landscape: bottom left of the view, above the control bar
+        // (the right side holds the stats and charts there), with the panel opening upwards, like the web's corner button
+        void PlaceTools(bool portrait)
+        {
+            if (portrait)
+            {
+                toolBtn.anchorMin = toolBtn.anchorMax = new Vector2(1, 0.5f); toolBtn.pivot = new Vector2(1, 0.5f); toolBtn.anchoredPosition = new Vector2(-24, 120);
+                panel.anchorMin = panel.anchorMax = new Vector2(1, 0.5f); panel.pivot = new Vector2(1, 1); panel.anchoredPosition = new Vector2(-24, 84);
+            }
+            else
+            {
+                toolBtn.anchorMin = toolBtn.anchorMax = new Vector2(0, 0); toolBtn.pivot = new Vector2(0, 0); toolBtn.anchoredPosition = new Vector2(36, 110);
+                panel.anchorMin = panel.anchorMax = new Vector2(0, 0); panel.pivot = new Vector2(0, 0); panel.anchoredPosition = new Vector2(36, 172);
+            }
         }
 
         void OnDisable() { Shader.SetGlobalFloat(ClipOnId, 0f); }
