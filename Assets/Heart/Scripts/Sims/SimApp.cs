@@ -62,6 +62,7 @@ namespace MedAtlas.Sims
                 return;
             }
             if (!PhysioBridge.Available) { BuildMessage("Тази симулация работи в уеб версията (линка). В Unity редактора са достъпни „Сърце“ и „Бели дробове“."); return; }
+            if (MuscleApp.Handles(SelectedId)) { gameObject.AddComponent<MuscleApp>().Init(cam, orbit, SelectedId); return; }
             def = MiniJson.O(MiniJson.Parse(PhysioBridge.Def(SelectedId)));
             if (def == null) { BuildMessage("Няма такава симулация: " + SelectedId); return; }
             sampleDt = (float)MiniJson.D(def, "sampleDt", 0.004);
@@ -243,10 +244,10 @@ namespace MedAtlas.Sims
             if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect * fw / fh), cam.fieldOfView, out var target, out var dist)) return;
             dist /= fh;
             orbit.Target = target;
-            orbit.SetView(SceneMirror.WebYaw, SceneMirror.WebPitch, dist);
+            orbit.SetView(mirror.Yaw, mirror.Pitch, dist);
             orbit.MinDistance = dist * 0.15f; orbit.MaxDistance = dist * 4f;
             cam.nearClipPlane = Mathf.Max(0.002f, dist / 150f);   // cell scenes are small: keep the near plane in front of them
-            if (first || mirror.Settling) { orbit.Yaw = SceneMirror.WebYaw; orbit.Pitch = SceneMirror.WebPitch; orbit.Distance = dist; orbit.ResetView(); }   // re-frame fully while the real anatomy arrives
+            if (first || mirror.Settling) { orbit.Yaw = mirror.Yaw; orbit.Pitch = mirror.Pitch; orbit.Distance = dist; orbit.ResetView(); }   // re-frame fully while the real anatomy arrives
         }
 
         void Build3D(string area, string id)

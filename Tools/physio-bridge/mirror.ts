@@ -24,6 +24,9 @@ const TAN20 = Math.tan((20 * Math.PI) / 180); // the web camera's half field of 
 
 interface Mirror {
   built: any;
+  /** Direction from the target to the camera (three.js axes) and the framing margin. */
+  dir: number[];
+  margin: number;
   root: Obj;
   partOf: Map<Obj, string>;
   ids: WeakMap<object, number>;
@@ -71,31 +74,36 @@ function matType(mt: Obj): number {
   return M_LIT;
 }
 
+/** The same materials the web viewer makes (viewer.makeMat): part-owned, double sided. */
+export const mirrorCtx = {
+  mat: (_pid: string, o: any) => {
+    const opacity = o.opacity ?? 1;
+    return new THREE.MeshStandardMaterial({
+      color: o.color, roughness: o.roughness ?? 0.55, metalness: o.metalness ?? 0.05,
+      transparent: opacity < 1, opacity, emissive: o.emissive ?? 0, side: THREE.DoubleSide, depthWrite: opacity >= 1,
+    });
+  },
+};
+
+/** Mirror a scene that is already built ({ root, parts, update }) under handle h. */
+export function mirrorAdopt(h: number, built: any, opts: { dir?: number[]; margin?: number } = {}): void {
+  const partOf = new Map<Obj, string>();
+  for (const [pid, objs] of Object.entries(built.parts ?? {}))
+    for (const o of objs as Obj[]) o.traverse?.((c: Obj) => { if (!partOf.has(c)) partOf.set(c, pid); });
+  const d = opts.dir ?? [0.35, 0.25, 1];
+  const n = Math.hypot(d[0], d[1], d[2]);
+  mirrors[h] = {
+    built, dir: d.map((v) => v / n), margin: opts.margin ?? 0.06, root: built.root, partOf, ids: new WeakMap(), next: 0, sig: '', ver: 0, nodes: [], kinds: [],
+    geoVer: new Map(), texVer: new Map(), structure: '', frame: new Float32Array(4096), frameLen: 0,
+    geoms: new Map(), texs: new Map(),
+  };
+}
+
 /** The web scene for instance `s` (bridge record with m, inst, v). */
 export function mirrorBuild(h: number, s: any): string {
   try {
-    const mats: any[] = [];
-    // The same materials the web viewer makes (viewer.makeMat): part-owned, double sided.
-    const ctx = {
-      mat: (_pid: string, o: any) => {
-        const opacity = o.opacity ?? 1;
-        const mat = new THREE.MeshStandardMaterial({
-          color: o.color, roughness: o.roughness ?? 0.55, metalness: o.metalness ?? 0.05,
-          transparent: opacity < 1, opacity, emissive: o.emissive ?? 0, side: THREE.DoubleSide, depthWrite: opacity >= 1,
-        });
-        mats.push(mat);
-        return mat;
-      },
-    };
-    const built = s.m.scene(ctx, s.inst, () => s.v);
-    const partOf = new Map<Obj, string>();
-    for (const [pid, objs] of Object.entries(built.parts ?? {}))
-      for (const o of objs as Obj[]) o.traverse?.((c: Obj) => { if (!partOf.has(c)) partOf.set(c, pid); });
-    mirrors[h] = {
-      built, root: built.root, partOf, ids: new WeakMap(), next: 0, sig: '', ver: 0, nodes: [], kinds: [],
-      geoVer: new Map(), texVer: new Map(), structure: '', frame: new Float32Array(4096), frameLen: 0,
-      geoms: new Map(), texs: new Map(),
-    };
+    const built = s.m.scene(mirrorCtx, s.inst, () => s.v);
+    mirrorAdopt(h, built);
     return JSON.stringify({ ok: true, distance: built.distance ?? 0 });
   } catch (e: any) {
     mirrors[h] = null;
@@ -438,9 +446,10 @@ export function mirrorTex(h: number, tid: number): Uint8Array {
  * win when present; userData.noFrame, points and instanced meshes do not count.
  * Returns [cx, cy, cz, dist] in Unity axes and web units, or [] when there is nothing to frame.
  */
-export function mirrorFit(h: number, aspect: number, fovDeg: number, margin = 0.06): string {
+export function mirrorFit(h: number, aspect: number, fovDeg: number): string {
   const m = mirrors[h];
   if (!m) return '[]';
+  const margin = m.margin;
   m.root.updateMatrixWorld(true);
   const pts: number[][] = [];
   const corner = (x: number, y: number, z: number, e: ArrayLike<number>) => {
@@ -464,8 +473,7 @@ export function mirrorFit(h: number, aspect: number, fovDeg: number, margin = 0.
   if (frames.length) frames.forEach(add);
   else add(m.root);
   if (!pts.length) return '[]';
-  const n = Math.hypot(0.35, 0.25, 1);
-  const dir = [0.35 / n, 0.25 / n, 1 / n];
+  const dir = m.dir;
   // right = up × dir, up' = dir × right (camera up is +y)
   let right = [dir[2], 0, -dir[0]];
   const rl = Math.hypot(right[0], right[1], right[2]);
@@ -487,5 +495,6 @@ export function mirrorFit(h: number, aspect: number, fovDeg: number, margin = 0.
     dist = Math.max(dist, dot(v, dir) + Math.abs(dot(v, right)) / tanH, dot(v, dir) + Math.abs(dot(v, up)) / tanV);
   }
   if (!(dist > 0)) return '[]';
-  return JSON.stringify([c[0], c[1], -c[2], dist]);
+  // the look direction in Unity axes, so Unity can turn its orbit camera the same way
+  return JSON.stringify([c[0], c[1], -c[2], dist, dir[0], dir[1], -dir[2]]);
 }

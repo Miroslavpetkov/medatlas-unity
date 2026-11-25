@@ -19,6 +19,8 @@ namespace MedAtlas.Sims
         public const float S = 0.02f;
         /// <summary>The web camera looks from (0.35, 0.25, 1): as Unity orbit angles.</summary>
         public const float WebYaw = -19.29f, WebPitch = 13.28f;
+        /// <summary>This scene's web look direction as orbit angles (set by Fit; flat diagrams are seen straight on).</summary>
+        public float Yaw = WebYaw, Pitch = WebPitch;
 
         const int K_MESH = 0, K_INST = 1, K_POINTS = 2, K_LINES = 3, K_STRIP = 4, K_LOOP = 5, K_SPRITE = 6;
         const int M_LIT = 0, M_BASIC = 1, M_POINTS = 2, M_LINE = 3, M_SPRITE = 4;
@@ -56,13 +58,15 @@ namespace MedAtlas.Sims
         Mesh quad;
         Camera cam;
 
-        public static SceneMirror Create(int handle, Camera cam)
+        /// <summary>Mirror the web scene of model instance `handle`; `prebuilt` when the page already built it under that
+        /// handle (the muscle section).</summary>
+        public static SceneMirror Create(int handle, Camera cam, bool prebuilt = false)
         {
             var go = new GameObject("WebScene");
             var m = go.AddComponent<SceneMirror>();
             m.h = handle; m.cam = cam;
             go.transform.localScale = Vector3.one * S;
-            var res = MiniJson.O(MiniJson.Parse(PhysioBridge.SceneBuild(handle) ?? "{}"));
+            var res = MiniJson.O(MiniJson.Parse(prebuilt ? "{\"ok\":true}" : PhysioBridge.SceneBuild(handle) ?? "{}"));
             m.Ok = res != null && res.TryGetValue("ok", out var ok) && ok is bool b && b;
             m.Error = res != null ? MiniJson.S(res, "err") : "no bridge";
             if (!m.Ok) { Debug.LogWarning("SceneMirror: " + m.Error); Destroy(go); return null; }
@@ -138,6 +142,13 @@ namespace MedAtlas.Sims
             if (a.Count < 4) return false;
             target = new Vector3((float)MiniJson.Num(a[0]), (float)MiniJson.Num(a[1]), (float)MiniJson.Num(a[2])) * S;
             dist = (float)MiniJson.Num(a[3]) * S;
+            if (a.Count >= 7)
+            {
+                // the web look direction (target -> camera) as orbit angles: the camera looks along its opposite
+                var f = -new Vector3((float)MiniJson.Num(a[4]), (float)MiniJson.Num(a[5]), (float)MiniJson.Num(a[6])).normalized;
+                Yaw = Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                Pitch = Mathf.Asin(Mathf.Clamp(-f.y, -1f, 1f)) * Mathf.Rad2Deg;
+            }
             return dist > 0;
         }
 
