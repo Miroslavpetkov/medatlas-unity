@@ -142,6 +142,7 @@ namespace MedAtlas.Sims
             foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
             {
                 if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
+                if (r.gameObject.layer == 2) continue;   // Ignore Raycast: labels, particles and lines of the web scene
                 if (r.transform == halo || !r.enabled || !r.gameObject.activeInHierarchy || r.GetComponentInParent<Canvas>() != null) continue;
                 if (!r.bounds.IntersectRay(ray)) continue;
                 if (HitMesh(r, ray, out float d)) hits.Add((r, d));

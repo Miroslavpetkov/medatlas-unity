@@ -24,7 +24,7 @@ namespace MedAtlas.Sims
         float speedK = 1; bool paused;
         Camera cam; OrbitCamera orbit;
         // 3D
-        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; MicroScene micro;
+        HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; SceneMirror mirror;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
@@ -40,6 +40,7 @@ namespace MedAtlas.Sims
         void ApplyOpacity(float o)
         {
             opacity = o;
+            if (mirror != null) mirror.Opacity = o;
             if (heart != null) heart.SetOpacity(o);
             if (lungs != null) lungs.SetOpacity(o);
             if (journey != null) journey.Opacity = o;
@@ -144,22 +145,6 @@ namespace MedAtlas.Sims
             switch (pack) { case "eye": return 45; case "torso": case "ans": return 60; default: return 100; }   // special and regional use the torso at 60 %
         }
 
-        /// <summary>Camera distance per cell scene, so the whole scene sits between the info card and the charts.</summary>
-        static float MicroDistance(MicroScene.Kind k)
-        {
-            switch (k)
-            {
-                case MicroScene.Kind.Synapse: return 14f;
-                case MicroScene.Kind.Sarcomere: return 15f;
-                case MicroScene.Kind.Nephron: return 15.5f;
-                case MicroScene.Kind.Skin: return 17f;
-                case MicroScene.Kind.Smooth: return 11.5f;
-                case MicroScene.Kind.Membrane: return 10f;
-                case MicroScene.Kind.Vessel: return 13.5f;
-                default: return 9.2f;   // axon
-            }
-        }
-
         static Bounds MeshBounds(Transform root)
         {
             var b = new Bounds(); bool any = false;
@@ -248,40 +233,29 @@ namespace MedAtlas.Sims
             PhysioBridge.Set(handle, MiniJson.Write(doses.Count > 0 ? WithDrugs() : values));
         }
 
-        public static MicroScene.Kind? MicroFor(string id)
+        /// <summary>The web viewer's framing (fitView) for this view's shape, from the same look direction.</summary>
+        void FrameMirror(bool first)
         {
-            switch (id)
-            {
-                case "membrane": case "cardiac-ap": case "signal": case "vesicles": case "potassium": return MicroScene.Kind.Membrane;
-                case "action-potential": case "electrotonic": case "nerve-fibres": return MicroScene.Kind.Axon;
-                case "haemodynamics": case "blood-flow": case "capillary": case "haemostasis": case "bloodgroups":
-                case "leukocytes": case "haemopoiesis": case "plasma": case "lipids": case "lymph": return MicroScene.Kind.Vessel;
-                case "synapse-receptors": case "neuron-glia": return MicroScene.Kind.Synapse;
-                case "muscle": return MicroScene.Kind.Sarcomere;
-                case "smooth": return MicroScene.Kind.Smooth;
-                case "kidney-filtration": case "epithelium": case "clearance": return MicroScene.Kind.Nephron;
-                case "skin": case "touch": return MicroScene.Kind.Skin;
-            }
-            return null;
+            if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect), cam.fieldOfView, out var target, out var dist)) return;
+            orbit.Target = target;
+            orbit.SetView(SceneMirror.WebYaw, SceneMirror.WebPitch, dist);
+            orbit.MinDistance = dist * 0.15f; orbit.MaxDistance = dist * 4f;
+            cam.nearClipPlane = Mathf.Max(0.002f, dist / 150f);   // cell scenes are small: keep the near plane in front of them
+            if (first) { orbit.Yaw = SceneMirror.WebYaw; orbit.Pitch = SceneMirror.WebPitch; orbit.Distance = dist; }
         }
 
         void Build3D(string area, string id)
         {
-            var mk = MicroFor(id);
-            if (mk != null)
+            if (id != "debug")
             {
-                var mroot = new GameObject("Micro"); micro = mroot.AddComponent<MicroScene>(); micro.Build(mk.Value, id);
-                orbit.Distance = MicroDistance(mk.Value); orbit.MinDistance = 2f; orbit.MaxDistance = 26f; orbit.Target = Vector3.zero; orbit.Yaw = -20f; orbit.Pitch = 18f;
-                // frame what was actually built: aim at the middle of the meshes and back off so all of it fits (30 deg FOV)
-                var mb = MeshBounds(mroot.transform);
-                if (mb.size.sqrMagnitude > 0.01f)
-                {
-                    // fit the height (bounding radius) and the width into the ~60 % of the screen left free by the panels
-                    float aspect = Mathf.Max(0.5f, cam != null ? cam.aspect : 1.6f);
-                    float wide = Mathf.Max(mb.extents.x, mb.extents.z) / (Mathf.Tan(15f * Mathf.Deg2Rad) * aspect * 0.6f);
-                    orbit.Target = mb.center; orbit.Distance = Mathf.Clamp(Mathf.Max(Mathf.Max(mb.extents.magnitude * 3.1f, wide), MicroDistance(mk.Value)), 6f, 26f);   // particles (filaments, cells) are not in the bounds: keep a floor per kind
-                }
-                viewShiftX = mk.Value == MicroScene.Kind.Skin ? 0.08f : 0.11f;   // cell scenes are wide: keep them left of the chart column
+                // The web version's own scene for this model, drawn by Unity (SceneMirror): same objects, animation,
+                // particles, labels and camera in both versions. No stand-in organs (instructions v4, part I).
+                mirror = SceneMirror.Create(handle, cam);
+                if (mirror == null) { Debug.LogWarning("Web scene not available for " + id); return; }
+                cam.fieldOfView = 40f;   // the web camera's field of view, so the framing and perspective match
+                FrameMirror(true);
+                mirror.OnStructure = () => { if (mirror.Settling) FrameMirror(false); };   // real anatomy arrives a moment later
+                viewShiftX = 0.08f;
                 return;
             }
             if (id == "human" || id == "exercise") area = "Heart";
@@ -417,7 +391,7 @@ namespace MedAtlas.Sims
             UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(110, H), () => orbit.ResetView()); x0 += 110 + G;
             UIKit.Btn fb = null;
             fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
-            if (heart != null || lungs != null || organ != null)
+            if (heart != null || lungs != null || organ != null || mirror != null)
             {
                 // opacity of the organs, 1–100 (100 = solid); the body journeys start as glass so the food stays visible
                 float start = organ != null ? StartOpacity(SelectedId, packName) : 100; opacity = start / 100f;
@@ -431,13 +405,14 @@ namespace MedAtlas.Sims
             bar.sizeDelta = new Vector2(x0 + 4, 64);
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();
-            if (heart == null && lungs == null && organ == null && micro == null)
+            if (heart == null && lungs == null && organ == null && mirror == null)
                 UIKit.LabelAt(C, "3D визуализацията за тази тема предстои", 18, new Color(1, 1, 1, 0.22f), new Vector2(560, -520), new Vector2(700, 30), UIKit.Italic, TextAnchor.UpperCenter);
             string creditText = "Физиологичен модел: Med Simulation 3D. Само за обучение.";
-            if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
+            if (mirror != null) creditText += " 3D сцена: същата като в уеб версията; анатомия от Z-Anatomy (CC BY-SA 4.0) и BodyParts3D (CC BY 4.0).";
+            else if (PackFor("", SelectedId) == "uterus") creditText += " Матка и яйчници: Human Reference Atlas, NIH 3D, по Visible Human (CC BY 4.0); маточните тръби са схематични.";
             var credit = UIKit.Label(C, creditText, 11, new Color(1, 1, 1, 0.28f), null, TextAnchor.LowerCenter);
             var crt = credit.rectTransform; crt.anchorMin = crt.anchorMax = new Vector2(0.5f, 0); crt.pivot = new Vector2(0.5f, 0); crt.anchoredPosition = new Vector2(0, 4); crt.sizeDelta = new Vector2(1400, 18);
-            layout = ResponsiveLayout.Attach(C, orbit, packName == "brain" ? 2.5f : packName == "uterus" || packName == "male" ? 2.2f : 1.75f);   // wide packs need more room on a tall phone screen
+            layout = ResponsiveLayout.Attach(C, orbit, mirror != null ? 1f : packName == "brain" ? 2.5f : packName == "uterus" || packName == "male" ? 2.2f : 1.75f);   // wide packs need more room on a tall phone screen
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
             // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
             picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
@@ -773,7 +748,7 @@ namespace MedAtlas.Sims
         void Drive3D(Dictionary<string, object> now, Dictionary<string, object> stats, float dt)
         {
             if (visuals != null) visuals.Tick(now, paused ? 0 : dt);
-            if (micro != null) micro.Tick(now, paused ? 0 : dt);
+            if (mirror != null) mirror.Tick(paused ? 0 : dt);   // as on the web: update(playing ? dt : 0)
             if (journey != null) journey.Tick(now, paused ? 0 : dt);
             if (organ != null && organ.Loaded)
             {
