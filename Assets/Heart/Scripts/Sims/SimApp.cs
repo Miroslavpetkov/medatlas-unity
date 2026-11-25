@@ -425,6 +425,10 @@ namespace MedAtlas.Sims
             layout.LandscapeOffsetX = 0.03f + viewShiftX;
             // tap a part of the 3D scene for its name, Latin name, description and function (the model's parts list)
             picker = PartPicker.Attach(gameObject, cam, C, def.ContainsKey("parts") ? MiniJson.L(def["parts"]) : null);
+            // parts that also do something when tapped (the auscultation points move the stethoscope there), as on the web
+            var partActs = def.ContainsKey("partActions") ? MiniJson.O(def["partActions"]) : null;
+            if (partActs != null && partActs.Count > 0)
+                picker.OnPart = pid => { if (partActs.TryGetValue(pid, out var a) && a is string act) PhysioBridge.Act(handle, act); };
             // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
             layout.SheetMode = true;
             PhoneSheet.Attach(this, C, layout, orbit);

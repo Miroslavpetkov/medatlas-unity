@@ -54,6 +54,9 @@ namespace MedAtlas.Sims
             ("intestine", "intestine|gut"), ("cord", "cord"), ("airway", "trachea|airway"),
         };
 
+        /// <summary>Called with the part id when a known part is tapped (the model may do an action for it).</summary>
+        public System.Action<string> OnPart;
+
         public static PartPicker Attach(GameObject host, Camera cam, Transform canvas, List<object> partsList)
         {
             var p = host.AddComponent<PartPicker>(); p.cam = cam; p.canvas = canvas;
@@ -180,6 +183,7 @@ namespace MedAtlas.Sims
                 t = name.Contains("|") ? name.Split('|')[0] : name.Replace(".l", " (ляво)").Replace(".r", " (дясно)");
                 l = ""; d = "Тази структура е част от 3D модела; моделът няма отделно описание за нея.";
             }
+            if (part != null) OnPart?.Invoke(MiniJson.S(part, "id"));
             title.text = t; latin.text = l; body.supportRichText = true; body.text = d;
             // portrait phones scale the 1920-wide canvas down a lot: bigger type, and the card sits below the title
             bool portrait = Screen.height > Screen.width;

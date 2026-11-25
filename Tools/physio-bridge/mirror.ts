@@ -88,11 +88,17 @@ export const mirrorCtx = {
   },
 };
 
-/** Mirror a scene that is already built ({ root, parts, update }) under handle h. */
-export function mirrorAdopt(h: number, built: any, opts: { dir?: number[]; margin?: number } = {}): void {
+/** Which part each object belongs to (scenes add parts later, e.g. organs that load after the scene is built). */
+function partsOf(built: any): Map<Obj, string> {
   const partOf = new Map<Obj, string>();
   for (const [pid, objs] of Object.entries(built.parts ?? {}))
     for (const o of objs as Obj[]) o.traverse?.((c: Obj) => { if (!partOf.has(c)) partOf.set(c, pid); });
+  return partOf;
+}
+
+/** Mirror a scene that is already built ({ root, parts, update }) under handle h. */
+export function mirrorAdopt(h: number, built: any, opts: { dir?: number[]; margin?: number } = {}): void {
+  const partOf = partsOf(built);
   const d = opts.dir ?? [0.35, 0.25, 1];
   const n = Math.hypot(d[0], d[1], d[2]);
   mirrors[h] = {
@@ -359,6 +365,7 @@ export function mirrorStructure(h: number): string {
   const m = mirrors[h];
   if (!m) return '{}';
   if (m.structure) return m.structure;
+  m.partOf = partsOf(m.built);
   const nodes: any[] = [];
   const geoms = new Map<number, any>();
   const mats = new Map<number, any>();

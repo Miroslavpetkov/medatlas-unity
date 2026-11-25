@@ -74,6 +74,8 @@ function def(m: any) {
     speeds: m.speeds, learn: (m.learn ?? []).map(bg),
     parts: (m.parts ?? []).map((p: any) => ({ id: p.id, name: bg(p.name), latin: p.latin ?? '', description: bg(p.description) ?? '', fn: bg(p.fn) ?? '' })),
     sampleDt: m.sampleDt ?? 0.004,
+    // tapping one of these parts also does an action (e.g. the stethoscope goes to that point)
+    partActions: m.partActions ?? {},
     // the drug layer: a time course laid over sliders the model already has (web drugs.ts); Unity applies it the same way
     drugs: drugsFor(m.id).map((d: any) => ({ id: d.id, label: bg(d.label), group: bg(d.group), how: bg(d.how), onset: d.onset, peak: d.peak, half: d.half, moves: d.moves })),
   };
