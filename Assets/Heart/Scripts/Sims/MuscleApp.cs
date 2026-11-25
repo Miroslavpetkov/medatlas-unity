@@ -20,7 +20,7 @@ namespace MedAtlas.Sims
         Transform C; RectTransform panel, content; ScrollRect scroll;
         Text chipText; readonly List<Text> cardVals = new List<Text>(); RawImage chartImg; Texture2D chartTex; string chartKind = "";
         Text sliderVal; Slider slider; bool settingSlider;
-        D view; string layoutKey = ""; float refreshT; PartPicker picker;
+        D view; string layoutKey = ""; float refreshT; PartPicker picker; View2D view2d;
         static bool Portrait => Screen.height > Screen.width * 1.05f;
         /// <summary>Canvas width on a phone held upright: 480 units keep the panel's 15–17 pt text at about 14 CSS px on a 390-px phone.</summary>
         const float PortraitW = 480f;
@@ -36,6 +36,10 @@ namespace MedAtlas.Sims
             SceneTabs.Add(C, "Sim");
             Open(PhysioBridge.MuscleOpen(modelId == "smooth" ? "smooth-path" : "sarcomere", Portrait));
             Rebuild(true);
+            // 2D schematic of the section's model (web: the "2D" button in the section header), over the free 3D area
+            view2d = View2D.AttachMuscle(gameObject, C);
+            view2d.Changed = on2d => { if (on2d) picker?.Hide(); };
+            if (View2D.Want) view2d.Set(true);
         }
 
         void BuildCanvas()

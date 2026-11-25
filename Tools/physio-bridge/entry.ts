@@ -1,10 +1,10 @@
 // Bridge between Unity and the medAtlas physiology models (same code as the web version).
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
 import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
-import { muscleOpen, muscleAct, muscleView, musclePart, muscleChart, muscleChartLen } from './muscle';
+import { muscleOpen, muscleAct, muscleView, musclePart, muscleChart, muscleChartLen, muscle2dId, muscle2dDrive } from './muscle';
 import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit, mirrorCam, mirrorTool } from './mirror';
 import { setLodBias } from '../medatlas/medAtlas-3D-main/src/core/lod';
-import { view2dHas, view2dOpen, view2dRect, view2dFrame, view2dClose } from './view2d';
+import { view2dHas, view2dOpen, view2dRect, view2dFrame, view2dClose, view2dPoll, view2dStep } from './view2d';
 
 // The web scenes load real anatomy (real/<topic>.bin, body/…) with relative URLs. The Unity page lives on another
 // path, so those requests go to the published web version (same origin on GitHub Pages, and it allows CORS).
@@ -82,6 +82,20 @@ function def(m: any) {
   };
 }
 
+/** The 2D diagram of the muscle section runs its own instance of the 'muscle' / 'smooth' model (as the web screen). */
+const M2D = 300000;
+let m2d: any = null;
+function muscle2d(): any {
+  const id = muscle2dId();
+  if (!m2d || m2d.m.id !== id) {
+    const m = find(id);
+    const v = { ...m.defaults };
+    m2d = { m, inst: m.create(v), v };
+  }
+  return m2d;
+}
+const m2dHandle = (s: any) => M2D + (s.m.id === 'smooth' ? 1 : 0);
+
 const api = {
   list: () => JSON.stringify(PHYSIO.map((m) => ({ id: m.id, title: bg(m.title), area: m.area, icon: m.icon, summary: bg(m.summary), presets: m.presets.length, charts: m.charts.length + (m.xy?.length ?? 0), controls: m.sliders.length + (m.toggles?.length ?? 0) }))),
   def: (id: string) => JSON.stringify(def(find(id))),
@@ -132,6 +146,20 @@ const api = {
   view2dOpen: (h: number) => view2dOpen(h, insts[h], (id) => insts[h]?.inst.act?.(id)),
   view2dRect: (x: number, y: number, w: number, hh: number) => view2dRect(x, y, w, hh),
   view2dFrame: (h: number, dt: number, playing: number) => view2dFrame(h, insts[h], dt, playing),
+  view2dPoll: () => view2dPoll(),
+  // the muscle section: open the diagram of its model, then each frame drive it from the section's controls and draw
+  muscle2dOpen: () => { const s = muscle2d(); return view2dOpen(m2dHandle(s), s, () => {}, false); },
+  muscle2dFrame: (dt: number) => {
+    const s = muscle2d();
+    const h = m2dHandle(s);
+    view2dOpen(h, s, () => {}, false);   // the other model when the student switched skeletal / smooth
+    const before = JSON.stringify(s.v);
+    const stp = muscle2dDrive(s.m.id, s.v);
+    if (JSON.stringify(s.v) !== before) s.inst.set(s.v);
+    s.inst.advance(dt * (s.m.speeds[0]?.k ?? 1));
+    view2dStep(stp);
+    view2dFrame(h, s, dt, 1);
+  },
   view2dClose: () => view2dClose(),
   curve: (h: number, i: number) => { const s = insts[h]; const x = s.m.xy[i]; return JSON.stringify(x.curve ? x.curve(s.v) : []); },
 };

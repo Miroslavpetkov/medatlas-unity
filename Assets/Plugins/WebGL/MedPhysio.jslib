@@ -85,6 +85,15 @@ mergeInto(LibraryManager.library, {
   MedPhysio_View2dFrame: function (h, dt, playing) {
     window.MedPhysio.view2dFrame(h, dt, playing);
   },
+  MedPhysio_View2dPoll: function () {
+    return (window.MedPhysio && window.MedPhysio.view2dPoll) ? window.MedPhysio.view2dPoll() : 0;
+  },
+  MedPhysio_Muscle2dOpen: function () {
+    return window.MedPhysio.muscle2dOpen();
+  },
+  MedPhysio_Muscle2dFrame: function (dt) {
+    window.MedPhysio.muscle2dFrame(dt);
+  },
   MedPhysio_View2dClose: function () {
     if (window.MedPhysio && window.MedPhysio.view2dClose) window.MedPhysio.view2dClose();
   },
