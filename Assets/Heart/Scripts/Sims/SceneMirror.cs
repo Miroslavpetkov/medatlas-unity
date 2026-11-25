@@ -104,13 +104,13 @@ namespace MedAtlas.Sims
         /// <summary>The web viewer's lights (viewer.ts), as shader globals.</summary>
         static void SetLights()
         {
-            Shader.SetGlobalVector("_MirKeyDir", Dir(120, 200, 160)); Shader.SetGlobalVector("_MirKeyCol", Lin(0xfff3e8, 2.1f));
+            Shader.SetGlobalVector("_MirKeyDir", Dir(120, 200, 160)); Shader.SetGlobalVector("_MirKeyCol", Lin(0xfff3e8, 1.7f));
             Shader.SetGlobalVector("_MirFillDir", Dir(-200, -40, -120)); Shader.SetGlobalVector("_MirFillCol", Lin(0x9fc3ff, 0.55f));
             Shader.SetGlobalVector("_MirRimDir", Dir(-80, 60, -200)); Shader.SetGlobalVector("_MirRimCol", Lin(0xbfd4ff, 0.9f));
             Shader.SetGlobalVector("_MirCamCol", Lin(0xffffff, 0.3f));
             Shader.SetGlobalVector("_MirSky", Lin(0xdce9ff, 0.85f)); Shader.SetGlobalVector("_MirGround", Lin(0x2a1d26, 0.85f));
             // x: environment intensity (web 0.55), y: exposure (web 1.15), z: soft tissue rim
-            Shader.SetGlobalVector("_MirEnv", new Vector4(0.55f, 1.15f, 0.08f, 0));
+            Shader.SetGlobalVector("_MirEnv", new Vector4(0.42f, 0.9f, 0.08f, 0));   // side-by-side QA: web 0.55/1.15 read clearly brighter and warmer here
             var fog = Lin(0x0a1020, 1f); fog.w = 0.0012f / S;   // FogExp2 density per Unity unit
             Shader.SetGlobalVector("_MirFogCol", fog);
         }
@@ -142,7 +142,7 @@ namespace MedAtlas.Sims
         }
 
         /// <summary>True for a few seconds after the scene was built (real anatomy is still arriving).</summary>
-        public bool Settling => Time.unscaledTime - builtAt < 6f;
+        public bool Settling => Time.unscaledTime - builtAt < 25f;   // body anatomy can take well over 6 s on a slow machine
 
         // ------------------------------------------------------------------ frame
 

@@ -236,13 +236,17 @@ namespace MedAtlas.Sims
         /// <summary>The web viewer's framing (fitView) for this view's shape, from the same look direction.</summary>
         void FrameMirror(bool first)
         {
-            if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect), cam.fieldOfView, out var target, out var dist)) return;
-            dist *= 1.25f;   // the web fits an open view; here the info card and the charts cover part of it
+            // Fit the scene into the part of the screen the panels leave free, not into the whole screen: in landscape the
+            // info card (left) and the charts (right) leave about the middle 36 % of the width and 80 % of the height.
+            bool portrait = Screen.height > Screen.width * 1.05f;
+            float fw = portrait ? 1f : 0.36f, fh = portrait ? 1f : 0.8f;
+            if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect * fw / fh), cam.fieldOfView, out var target, out var dist)) return;
+            dist /= fh;
             orbit.Target = target;
             orbit.SetView(SceneMirror.WebYaw, SceneMirror.WebPitch, dist);
             orbit.MinDistance = dist * 0.15f; orbit.MaxDistance = dist * 4f;
             cam.nearClipPlane = Mathf.Max(0.002f, dist / 150f);   // cell scenes are small: keep the near plane in front of them
-            if (first) { orbit.Yaw = SceneMirror.WebYaw; orbit.Pitch = SceneMirror.WebPitch; orbit.Distance = dist; }
+            if (first || mirror.Settling) { orbit.Yaw = SceneMirror.WebYaw; orbit.Pitch = SceneMirror.WebPitch; orbit.Distance = dist; orbit.ResetView(); }   // re-frame fully while the real anatomy arrives
         }
 
         void Build3D(string area, string id)
