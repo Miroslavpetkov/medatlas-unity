@@ -21,7 +21,9 @@ namespace MedAtlas.Sims
         Text chipText; readonly List<Text> cardVals = new List<Text>(); RawImage chartImg; Texture2D chartTex; string chartKind = "";
         Text sliderVal; Slider slider; bool settingSlider;
         D view; string layoutKey = ""; float refreshT; PartPicker picker;
-        bool Portrait => Screen.height > Screen.width * 1.05f;
+        static bool Portrait => Screen.height > Screen.width * 1.05f;
+        /// <summary>Canvas width on a phone held upright: 480 units keep the panel's 15–17 pt text at about 14 CSS px on a 390-px phone.</summary>
+        const float PortraitW = 480f;
         float W => Portrait ? 1040f : 600f;   // panel width in canvas units (reference 1920 × 1080)
 
         public static bool Handles(string id) => id == "muscle" || id == "smooth";
@@ -119,9 +121,18 @@ namespace MedAtlas.Sims
         {
             bool portrait = Portrait;
             var crt = (RectTransform)C;
-            float ph = portrait ? crt.rect.height * 0.5f : crt.rect.height - 40f;
+            var scaler = C.GetComponent<CanvasScaler>();
+            if (scaler != null)
+            {
+                // a phone held upright is laid out on a 1080-wide canvas (like the physiology screens), landscape on 1920 × 1080
+                scaler.referenceResolution = portrait ? new Vector2(PortraitW, PortraitW * 16f / 9f) : new Vector2(1920, 1080);
+                scaler.matchWidthOrHeight = portrait ? 0f : 0.6f;
+                Canvas.ForceUpdateCanvases();
+            }
+            float cw0 = portrait ? PortraitW : crt.rect.width, ch0 = portrait ? PortraitW * Screen.height / Mathf.Max(1, Screen.width) : crt.rect.height;
+            float ph = portrait ? ch0 * 0.5f : ch0 - 40f;
             panel = portrait
-                ? UIKit.Rect("MusclePanel", C, new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 0), new Vector2(crt.rect.width, ph))
+                ? UIKit.Rect("MusclePanel", C, new Vector2(0, 0), new Vector2(1, 0), new Vector2(0.5f, 0), new Vector2(0, 0), new Vector2(0, ph))
                 : UIKit.Rect("MusclePanel", C, new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(-20, 0), new Vector2(W, ph));
             UIKit.PanelImage(panel, UIKit.Panel);
             var vp = UIKit.Rect("Viewport", panel, Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
@@ -130,7 +141,7 @@ namespace MedAtlas.Sims
             content = UIKit.Rect("Content", vp, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(0, 100));
             scroll = panel.gameObject.AddComponent<ScrollRect>();
             scroll.viewport = vp; scroll.content = content; scroll.horizontal = false; scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 40f;
-            float w = (portrait ? crt.rect.width : W) - 2 * Pad;
+            float w = (portrait ? cw0 : W) - 2 * Pad;
             var v = view;
             y = -Pad;
 
@@ -255,7 +266,7 @@ namespace MedAtlas.Sims
                 float bw = Mathf.Max(minW, label.Length * font * 0.58f + 30f);
                 if (x > 0 && x + bw > w) { x = 0; y -= h + g; }
                 var holder = UIKit.Rect("row", content, new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(Pad, y), new Vector2(w, h));
-                var b = UIKit.Button(holder, label, new Vector2(x, -h / 2), new Vector2(bw, h), () => onClick(id), font);
+                var b = UIKit.Button(holder, label, new Vector2(x, 0), new Vector2(bw, h), () => onClick(id), font);   // the button is anchored at the holder's middle
                 bool on = d.TryGetValue("on", out var ov) && ov is bool ob && ob;
                 bool main = d.TryGetValue("main", out var mv) && mv is bool mb && mb;
                 b.On = on || main;
