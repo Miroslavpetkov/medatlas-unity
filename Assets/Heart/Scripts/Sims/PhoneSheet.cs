@@ -84,9 +84,10 @@ namespace MedAtlas.Sims
             st.gameObject.AddComponent<Button>().onClick.AddListener(() => OpenTab("states"));
             stateDot = UIKit.Dot(st, new Vector2(22, -40), 14, Color.white);
             UIKit.LabelAt(st, "СЪСТОЯНИЕ", 16, UIKit.Accent, new Vector2(48, -8), new Vector2(300, 22), UIKit.SemiBold);
-            stateName = UIKit.LabelAt(st, "", 24, UIKit.TextMain, new Vector2(48, -32), new Vector2(W - 2 * Pad - 260, 32), UIKit.SemiBold);
-            stateName.horizontalOverflow = HorizontalWrapMode.Overflow;
-            statePhase = UIKit.LabelAt(st, "", 20, UIKit.TextDim, new Vector2(W - 2 * Pad - 330, -30), new Vector2(240, 30), null, TextAnchor.UpperRight);
+            stateName = UIKit.LabelAt(st, "", 24, UIKit.TextMain, new Vector2(48, -32), new Vector2(W - 2 * Pad - 400, 32), UIKit.SemiBold);   // ends before the phase text
+            stateName.horizontalOverflow = HorizontalWrapMode.Wrap; stateName.verticalOverflow = VerticalWrapMode.Truncate;
+            statePhase = UIKit.LabelAt(st, "", 20, UIKit.TextDim, new Vector2(W - 2 * Pad - 340, -30), new Vector2(205, 30), null, TextAnchor.UpperRight);   // ends 15 px before "Смени ›"
+            statePhase.horizontalOverflow = HorizontalWrapMode.Wrap; statePhase.verticalOverflow = VerticalWrapMode.Truncate;
             UIKit.LabelAt(st, "Смени ›", 22, UIKit.Accent, new Vector2(W - 2 * Pad - 118, -28), new Vector2(104, 30), UIKit.SemiBold, TextAnchor.UpperRight);
 
             // tabs
@@ -172,15 +173,19 @@ namespace MedAtlas.Sims
         }
 
         // ------------------------------------------------------------------ sheet behaviour
-        public void BeginDrag() { dragging = true; }
+        float dragStartH;
+        public void BeginDrag() { dragging = true; dragStartH = height; }
         public void Drag(float dyScreen) { height = Mathf.Clamp(height + dyScreen / Mathf.Max(0.01f, cv.scaleFactor), CollapsedH, SnapH(2)); }
         public void EndDrag(float lastDy)
         {
             dragging = false;
             int best = 0; float bd = float.MaxValue;
             for (int s = 0; s < 3; s++) { float d = Mathf.Abs(SnapH(s) - height); if (d < bd) { bd = d; best = s; } }
-            if (lastDy > 6 && best < 2 && SnapH(best) < height) best++;          // a flick up opens one step further
-            if (lastDy < -6 && best > 0 && SnapH(best) > height) best--;         // a flick down folds one step
+            // the direction of the whole drag decides: down folds, up opens (a short flick moves one step)
+            float moved = height - dragStartH;
+            if ((moved > 20 || lastDy > 6) && best < 2 && SnapH(best) < height) best++;
+            if ((moved < -20 || lastDy < -6) && best > 0 && SnapH(best) > height) best--;
+            if (moved < -20 && SnapH(best) > dragStartH - 1) best = Mathf.Max(0, best - 1);
             snap = best;
         }
         public void Toggle() { snap = snap == 0 ? 1 : 0; }
@@ -336,17 +341,19 @@ namespace MedAtlas.Sims
             float free = Mathf.Max(0.12f, (h - headerH - covered) / h);
             float centre = (covered + (h - headerH)) * 0.5f / h;
             orbit.ViewOffsetY = 0.536f * (centre - 0.5f);
-            orbit.DistanceScale = layout.PortraitScale * Mathf.Clamp(0.58f / free, 1f, 2.6f);
+            orbit.DistanceScale = layout.PortraitScale * 0.8f * Mathf.Clamp(0.58f / free, 1f, 1.8f);   // keep the organ large in the free space
         }
     }
 
     /// <summary>The sheet's handle and number row: drag to resize, tap to open or fold.</summary>
-    public class SheetHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+    public class SheetHandle : MonoBehaviour, IPointerDownHandler, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
-        public PhoneSheet Sheet; float lastDy;
-        public void OnBeginDrag(PointerEventData e) { Sheet.BeginDrag(); lastDy = 0; }
+        public PhoneSheet Sheet; float lastDy; bool moved;
+        public void OnPointerDown(PointerEventData e) { moved = false; }
+        public void OnBeginDrag(PointerEventData e) { Sheet.BeginDrag(); lastDy = 0; moved = true; }
         public void OnDrag(PointerEventData e) { Sheet.Drag(e.delta.y); lastDy = e.delta.y; }
         public void OnEndDrag(PointerEventData e) => Sheet.EndDrag(lastDy);
-        public void OnPointerClick(PointerEventData e) { if (!e.dragging) Sheet.Toggle(); }
+        // the input module also sends a click at the end of a drag on the same object: only a tap without movement toggles
+        public void OnPointerClick(PointerEventData e) { if (!moved && !e.dragging) Sheet.Toggle(); }
     }
 }
