@@ -76,6 +76,16 @@ namespace MedAtlas.Heart
             if (p) PortraitFrame();
         }
 
+        bool hintOff;
+
+        /// <summary>Hide the 3D controls hint (drag to rotate…) while the 2D schematic is shown: it has nothing to rotate,
+        /// and the hint line would run under the 2D layer. Phones held upright never show it.</summary>
+        public void HideHint(bool off)
+        {
+            hintOff = off;
+            if (hint && !Portrait) hint.gameObject.SetActive(!off);
+        }
+
         void Apply(bool p)
         {
             if (!p)
@@ -84,7 +94,7 @@ namespace MedAtlas.Heart
                 foreach (var rt in saved.Keys) Restore(rt);
                 if (graphs) graphs.gameObject.SetActive(true);
                 if (stats) stats.gameObject.SetActive(true);
-                if (hint) hint.gameObject.SetActive(true);
+                if (hint) hint.gameObject.SetActive(!hintOff);
                 bool ov = (scen && scen.gameObject.activeSelf) || (par && par.gameObject.activeSelf);
                 if (card && !ov) card.gameObject.SetActive(true);
                 tabsRoot.gameObject.SetActive(false);
