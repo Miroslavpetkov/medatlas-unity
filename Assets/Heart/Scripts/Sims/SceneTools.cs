@@ -78,6 +78,17 @@ namespace MedAtlas.Sims
             Section("", 0);
         }
 
+        bool suspended;
+
+        /// <summary>While the 2D schematic covers the 3D area the 3D tools have nothing to act on, and their button,
+        /// panel and bar would sit under the HTML layer: hide them, and bring the button back afterwards.</summary>
+        public void Suspend(bool s)
+        {
+            suspended = s;
+            toolBtn.gameObject.SetActive(!s);
+            if (s) { panel.gameObject.SetActive(false); bar.gameObject.SetActive(false); }
+        }
+
         void TogglePanel()
         {
             bool on = !panel.gameObject.activeSelf;
@@ -236,6 +247,7 @@ namespace MedAtlas.Sims
         void Update()
         {
             if (planeOn) ApplyPlane();
+            if (suspended) return;
             if (bar.gameObject.activeSelf) Place();
             bool portrait = Portrait;
             float k = portrait ? 1.3f : 1f;
