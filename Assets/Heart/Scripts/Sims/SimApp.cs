@@ -431,6 +431,8 @@ namespace MedAtlas.Sims
                 foreach (var k in partActs.Keys) picker.BoxPick.Add(k);
             if (partActs != null && partActs.Count > 0)
                 picker.OnPart = pid => { if (partActs.TryGetValue(pid, out var a) && a is string act) PhysioBridge.Act(handle, act); };
+            // hide / see-through / isolate a tapped part, double tap to focus, layers slider and live section (as on the web)
+            if (mirror != null) SceneTools.Attach(gameObject, handle, mirror, orbit, picker, C);
             // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
             layout.SheetMode = true;
             PhoneSheet.Attach(this, C, layout, orbit);

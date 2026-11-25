@@ -29,6 +29,7 @@ namespace MedAtlas.Sims
         [DllImport("__Internal")] static extern IntPtr MedPhysio_SceneFit(int h, float aspect, float fov);
         [DllImport("__Internal")] static extern void MedPhysio_SceneCam(int h, float x, float y, float z);
         [DllImport("__Internal")] static extern void MedPhysio_LodBias(float b);
+        [DllImport("__Internal")] static extern IntPtr MedPhysio_SceneTool(int h, string cmd, string arg);
 
         [DllImport("__Internal")] static extern int MedPhysio_MuscleOpen(string tab, int phone);
         [DllImport("__Internal")] static extern int MedPhysio_MuscleAct(string cmd, string arg, int phone);
@@ -61,6 +62,8 @@ namespace MedAtlas.Sims
         public static void SceneCam(int h, float x, float y, float z) => MedPhysio_SceneCam(h, x, y, z);
         /// <summary>Below 1 the lighter levels of detail show sooner (Low quality profile).</summary>
         public static void LodBias(float b) => MedPhysio_LodBias(b);
+        /// <summary>3D tools of the mirrored scene (hide / see-through / isolate, layers, section): see mirrorTool in mirror.ts.</summary>
+        public static string SceneTool(int h, string cmd, string arg) => Take(MedPhysio_SceneTool(h, cmd, arg ?? ""));
         // muscle section (MuscleApp.cs)
         public static int MuscleOpen(string tab, bool phone) => MedPhysio_MuscleOpen(tab ?? "", phone ? 1 : 0);
         public static int MuscleAct(string cmd, string arg, bool phone) => MedPhysio_MuscleAct(cmd, arg ?? "", phone ? 1 : 0);
@@ -88,6 +91,7 @@ namespace MedAtlas.Sims
         public static string SceneFit(int h, float aspect, float fov) => "[]";
         public static void SceneCam(int h, float x, float y, float z) { }
         public static void LodBias(float b) { }
+        public static string SceneTool(int h, string cmd, string arg) => "";
         public static int MuscleOpen(string tab, bool phone) => -1;
         public static int MuscleAct(string cmd, string arg, bool phone) => -1;
         public static string MuscleView() => "{}";

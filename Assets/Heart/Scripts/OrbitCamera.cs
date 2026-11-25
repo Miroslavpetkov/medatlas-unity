@@ -31,7 +31,11 @@ namespace MedAtlas.Heart
         /// <summary>Change the default view after start (e.g. once a model has loaded).</summary>
         public void SetView(float yaw, float pitch, float dist) { defYaw = tYaw = yaw; defPitch = tPitch = pitch; defDist = tDist = dist; }
 
-        public void ResetView() { tYaw = defYaw; tPitch = defPitch; tDist = defDist; tPan = Vector3.zero; }
+        float panLimit = 1.5f;
+        public void ResetView() { tYaw = defYaw; tPitch = defPitch; tDist = defDist; tPan = Vector3.zero; panLimit = 1.5f; }
+
+        /// <summary>Glide (ease-out) to a point of the scene at this distance: double tap or "Фокус" on a part.</summary>
+        public void FocusOn(Vector3 point, float dist) { tPan = point - Target; panLimit = Mathf.Max(1.5f, tPan.magnitude + 0.5f); tDist = Mathf.Clamp(dist, MinDistance, MaxDistance); }
 
         static bool OverUI(Vector2 screen)
         {
@@ -117,7 +121,7 @@ namespace MedAtlas.Heart
             float k = tDist * 0.0012f * 1080f / Mathf.Max(Screen.height, 1);
             var rot = Quaternion.Euler(tPitch, tYaw, 0f);
             tPan -= rot * new Vector3(d.x, d.y, 0) * k;
-            tPan = Vector3.ClampMagnitude(tPan, 1.5f);
+            tPan = Vector3.ClampMagnitude(tPan, panLimit);
         }
     }
 }

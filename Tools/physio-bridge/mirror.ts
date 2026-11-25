@@ -15,6 +15,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as THREE from 'three';
 import { pickLods } from '../medatlas/medAtlas-3D-main/src/core/lod';
+import { anatomyLayers } from '../medatlas/medAtlas-3D-main/src/physio/layers';
 
 type Obj = any;
 
@@ -45,7 +46,21 @@ interface Mirror {
   texs: Map<number, Obj>;
   /** Unity's camera in this scene's world (three.js coordinates), for the levels of detail. */
   cam: THREE.Vector3 | null;
+  /** Hide / see-through / isolate and the layers slider (the same tools as the web viewer). */
+  tools: Tools;
 }
+
+interface Tools {
+  mode: Map<string, 'hide' | 'fade'>;
+  isolated: string | null;
+  peeled: Set<string>;
+  orig: WeakMap<Obj, any>;
+  faded: Map<any, any>;
+  ghosts: Map<any, any>;
+  dirty: boolean;
+}
+
+const newTools = (): Tools => ({ mode: new Map(), isolated: null, peeled: new Set(), orig: new WeakMap(), faded: new Map(), ghosts: new Map(), dirty: false });
 
 const mirrors: (Mirror | null)[] = [];
 
@@ -104,7 +119,7 @@ export function mirrorAdopt(h: number, built: any, opts: { dir?: number[]; margi
   mirrors[h] = {
     built, dir: d.map((v) => v / n), margin: opts.margin ?? 0.06, root: built.root, partOf, ids: new WeakMap(), next: 0, sig: '', ver: 0, nodes: [], kinds: [],
     geoVer: new Map(), texVer: new Map(), structure: '', frame: new Float32Array(4096), frameLen: 0,
-    geoms: new Map(), texs: new Map(), cam: null,
+    geoms: new Map(), texs: new Map(), cam: null, tools: newTools(),
   };
 }
 
@@ -200,7 +215,9 @@ export function mirrorFrame(h: number, dt: number): number {
   const nodes: Obj[] = [];
   const vis: boolean[] = [];
   const sig: string[] = [];
+  if (m.tools.dirty) applyTools(m);
   walk(m.root, true, (o, v) => {
+    if (v && hiddenByTools(m, o)) v = false;
     const k = kindOf(o);
     if (k < 0 || !o.geometry && k !== K_SPRITE) return;
     const mt = Array.isArray(o.material) ? o.material[0] : o.material;
@@ -366,6 +383,7 @@ export function mirrorStructure(h: number): string {
   if (!m) return '{}';
   if (m.structure) return m.structure;
   m.partOf = partsOf(m.built);
+  if (m.tools.mode.size || m.tools.isolated || m.tools.peeled.size) m.tools.dirty = true;   // parts that loaded later follow the tools too
   const nodes: any[] = [];
   const geoms = new Map<number, any>();
   const mats = new Map<number, any>();
@@ -517,4 +535,106 @@ export function mirrorCam(h: number, x: number, y: number, z: number): void {
   const m = mirrors[h];
   if (!m) return;
   (m.cam ??= new THREE.Vector3()).set(x, y, z);
+}
+
+// ------------------------------------------------------------------ hide / see-through / isolate, layers, section
+// The same tools as the web viewer (src/core/viewer.ts): hiding only changes what Unity is told is visible, and a
+// see-through part gets a faded copy of its material (a new material id, so Unity picks it up with the structure).
+
+function hiddenByTools(m: Mirror, o: Obj): boolean {
+  const t = m.tools;
+  if (!t.mode.size && !t.peeled.size) return false;
+  const p = m.partOf.get(o);
+  return !!p && (t.peeled.has(p) || t.mode.get(p) === 'hide');
+}
+
+function fadedOf(t: Tools, mt: any, ghost: boolean): any {
+  const map = ghost ? t.ghosts : t.faded;
+  let f = map.get(mt);
+  if (!f) {
+    f = mt.clone();
+    f.transparent = true;
+    f.opacity = Math.min(mt.opacity ?? 1, ghost ? 0.05 : 0.16);
+    f.depthWrite = false;
+    map.set(mt, f);
+  }
+  return f;
+}
+
+function applyTools(m: Mirror): void {
+  const t = m.tools;
+  t.dirty = false;
+  for (const [id, objs] of Object.entries(m.built.parts ?? {})) {
+    const ghost = !!t.isolated && t.isolated !== id && t.mode.get(id) !== 'hide';
+    const fade = ghost || t.mode.get(id) === 'fade';
+    for (const root of objs as Obj[])
+      root.traverse?.((o: Obj) => {
+        if (!o.material) return;
+        if (fade) {
+          if (!t.orig.has(o)) t.orig.set(o, o.material);
+          const orig = t.orig.get(o);
+          o.material = Array.isArray(orig) ? orig.map((x: any) => fadedOf(t, x, ghost)) : fadedOf(t, orig, ghost);
+        } else if (t.orig.has(o)) {
+          o.material = t.orig.get(o);
+          t.orig.delete(o);
+        }
+      });
+  }
+}
+
+/** Box of the scene (three.js world), for the section plane. */
+function sceneBox(m: Mirror): THREE.Box3 {
+  m.root.updateMatrixWorld(true);
+  const b = new THREE.Box3();
+  m.root.traverse((o: Obj) => {
+    if (o.isMesh && o.geometry && !o.userData?.noFrame) b.expandByObject(o);
+  });
+  if (b.isEmpty()) b.setFromObject(m.root);
+  return b;
+}
+
+/**
+ * One call for the 3D tools, from Unity (Tools in SimApp):
+ *   mode  "id|hide" / "id|fade" / "id|show"   iso "id" ("" ends it)   all
+ *   modeOf "id" -> show | hide | fade | isolate
+ *   layers -> JSON [names in Bulgarian, outside in]   peel "n" (how many layers are taken away)
+ *   section "x|0.2" (axis x, y or z; "" removes it) -> "nx,ny,nz,d" in Unity axes (keep where n·p + d >= 0), or ""
+ */
+export function mirrorTool(h: number, cmd: string, arg: string): string {
+  const m = mirrors[h];
+  if (!m) return '';
+  const t = m.tools;
+  if (cmd === 'mode') {
+    const [id, mode] = arg.split('|');
+    if (mode === 'show') t.mode.delete(id);
+    else if (mode === 'hide' || mode === 'fade') t.mode.set(id, mode);
+    t.dirty = true;
+  } else if (cmd === 'iso') {
+    t.isolated = arg || null;
+    t.dirty = true;
+  } else if (cmd === 'all') {
+    t.mode.clear();
+    t.isolated = null;
+    t.dirty = true;
+  } else if (cmd === 'modeOf') {
+    return t.isolated === arg ? 'isolate' : (t.mode.get(arg) ?? 'show');
+  } else if (cmd === 'changed') {
+    return t.mode.size || t.isolated ? '1' : '0';
+  } else if (cmd === 'layers') {
+    return JSON.stringify(anatomyLayers(Object.keys(m.built.parts ?? {})).map((g) => g.name.bg));
+  } else if (cmd === 'peel') {
+    const groups = anatomyLayers(Object.keys(m.built.parts ?? {}));
+    t.peeled = new Set(groups.slice(0, Math.max(0, Math.min(groups.length, Number(arg) || 0))).flatMap((g) => g.ids));
+  } else if (cmd === 'section') {
+    const [axis, pos] = arg.split('|');
+    if (axis !== 'x' && axis !== 'y' && axis !== 'z') return '';
+    const b = sceneBox(m);
+    const c = b.getCenter(new THREE.Vector3());
+    const r = b.getSize(new THREE.Vector3()).length() / 2 || 1;
+    // keep the half behind the plane, as on the web (normal -axis): -p[axis] + c[axis] + pos·r >= 0
+    const k = c[axis] + (Number(pos) || 0) * r;
+    const n = [axis === 'x' ? -1 : 0, axis === 'y' ? -1 : 0, axis === 'z' ? 1 : 0];   // z negated for Unity
+    return `${n[0]},${n[1]},${n[2]},${k}`;
+  }
+  return '';
 }

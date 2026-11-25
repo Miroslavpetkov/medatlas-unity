@@ -65,6 +65,7 @@ Shader "MedAtlas/MirrorSprite"
 
             half4 frag (Varyings i) : SV_Target
             {
+                MirClipTest(i.positionWS);
                 half4 t = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
                 float3 c = t.rgb * _Color.rgb;
                 if (_ToneMap > 0.5h) c = MirACES(c);

@@ -117,4 +117,12 @@ float3 MirrorFinish(float3 c, float3 posWS, float toneMap)
     return lerp(c, _MirFogCol.rgb, saturate(f));
 }
 
+// Live section (the 3D tools' "Срез"): keep what is in front of the plane, dot(n, p) + w >= 0 (world space).
+float4 _MirClip;
+float _MirClipOn;
+void MirClipTest(float3 ws)
+{
+    if (_MirClipOn > 0.5 && dot(_MirClip.xyz, ws) + _MirClip.w < 0.0) discard;
+}
+
 #endif

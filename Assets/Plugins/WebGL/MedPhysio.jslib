@@ -66,6 +66,12 @@ mergeInto(LibraryManager.library, {
   MedPhysio_LodBias: function (b) {
     window.MedPhysio.lodBias(b);
   },
+  MedPhysio_Vibrate: function (ms) {
+    if (navigator.vibrate) navigator.vibrate(ms);
+  },
+  MedPhysio_SceneTool: function (h, cmd, arg) {
+    return stringToNewUTF8(window.MedPhysio.sceneTool(h, UTF8ToString(cmd), UTF8ToString(arg)) || '');
+  },
   // ---- muscle section (Tools/physio-bridge/muscle.ts)
   MedPhysio_MuscleOpen: function (tab, phone) {
     return window.MedPhysio.muscleOpen(UTF8ToString(tab), phone);

@@ -57,6 +57,16 @@ namespace MedAtlas.Sims
         /// <summary>Called with the part id when a known part is tapped (the model may do an action for it).</summary>
         public System.Action<string> OnPart;
 
+        /// <summary>Called with the tapped object (any part, also those the model does not describe), and with null when
+        /// a tap hits nothing; `twice` is a second tap on the same object within 0.35 s (focus).</summary>
+        public System.Action<Renderer, bool> OnPicked;
+
+        /// <summary>Optional: a hit point the live section has cut away does not count.</summary>
+        public System.Func<Vector3, bool> Keep;
+        Renderer lastTap; float lastTapTime;
+        /// <summary>The part card (the tools bar sits under it).</summary>
+        public RectTransform Card => card;
+
         /// <summary>Parts (object names) that are picked by their box, label included, not only by their triangles:
         /// small targets such as the thin auscultation rings, which a tap in the ring's middle would otherwise miss
         /// (the web picks them by the ring and its letter label).</summary>
@@ -160,7 +170,7 @@ namespace MedAtlas.Sims
                     continue;
                 }
                 if (!r.bounds.IntersectRay(ray)) continue;
-                if (HitMesh(r, ray, out float d)) hits.Add((r, d));
+                if (HitMesh(r, ray, out float d) && (Keep == null || Keep(ray.GetPoint(d)))) hits.Add((r, d));
             }
             hits.Sort((a, b) => a.d.CompareTo(b.d));
             Renderer best = null; Renderer smallestGlass = null; float glassVol = float.MaxValue;
@@ -172,8 +182,11 @@ namespace MedAtlas.Sims
                 if (v < glassVol) { glassVol = v; smallestGlass = r; }
             }
             if (best == null) best = smallestGlass;
-            if (best == null) { Hide(); return; }
+            if (best == null) { Hide(); OnPicked?.Invoke(null, false); lastTap = null; return; }
+            bool twice = best == lastTap && Time.unscaledTime - lastTapTime < 0.35f;
+            lastTap = best; lastTapTime = Time.unscaledTime;
             Show(best);
+            OnPicked?.Invoke(best, twice);
         }
 
         void Show(Renderer r)
