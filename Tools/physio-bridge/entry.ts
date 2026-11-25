@@ -4,6 +4,7 @@ import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
 import { muscleOpen, muscleAct, muscleView, musclePart, muscleChart, muscleChartLen } from './muscle';
 import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit, mirrorCam, mirrorTool } from './mirror';
 import { setLodBias } from '../medatlas/medAtlas-3D-main/src/core/lod';
+import { view2dHas, view2dOpen, view2dRect, view2dFrame, view2dClose } from './view2d';
 
 // The web scenes load real anatomy (real/<topic>.bin, body/…) with relative URLs. The Unity page lives on another
 // path, so those requests go to the published web version (same origin on GitHub Pages, and it allows CORS).
@@ -126,6 +127,12 @@ const api = {
   musclePart: (id: string) => musclePart(id),
   muscleChart: (kind: string, w: number, h: number) => muscleChart(kind, w, h),
   muscleChartLen: (x: number, w: number) => muscleChartLen(x, w),
+  // 2D schematic mode (view2d.ts): the web 2D view over the 3D area, on the same instance
+  view2dHas: (id: string) => view2dHas(id),
+  view2dOpen: (h: number) => view2dOpen(h, insts[h], (id) => insts[h]?.inst.act?.(id)),
+  view2dRect: (x: number, y: number, w: number, hh: number) => view2dRect(x, y, w, hh),
+  view2dFrame: (h: number, dt: number, playing: number) => view2dFrame(h, insts[h], dt, playing),
+  view2dClose: () => view2dClose(),
   curve: (h: number, i: number) => { const s = insts[h]; const x = s.m.xy[i]; return JSON.stringify(x.curve ? x.curve(s.v) : []); },
 };
 (globalThis as any).MedPhysio = api;

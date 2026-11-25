@@ -189,6 +189,8 @@ namespace MedAtlas.Sims
             snap = best;
         }
         public void Toggle() { snap = snap == 0 ? 1 : 0; }
+        /// <summary>The sheet itself (its top edge is the bottom of the 3D area on a phone).</summary>
+        public RectTransform SheetRect => active ? sheet : null;
 
         void TabClicked(string id)
         {

@@ -27,6 +27,7 @@ namespace MedAtlas.Sims
         HeartModel heart; CardiacModel heartSim; LungAnatomy lungs; LungModel lungSim; OrganView organ; float actMax = 1e-6f; SimVisuals visuals; JourneyView journey; ResponsiveLayout layout; bool focus; SceneMirror mirror;
         // UI
         RectTransform card, scenPanel, parPanel, learnPanel;
+        View2D view2d; UIKit.Btn view2dBtn;
         Text phaseTitle, phaseText, scenTitle, scenText, statsLabels, statsValues;
         Image phaseDot;
         UIKit.Btn pauseBtn, scenBtn, parBtn, learnBtn; readonly List<UIKit.Btn> speedBtns = new List<UIKit.Btn>();
@@ -397,6 +398,8 @@ namespace MedAtlas.Sims
             UIKit.Button(bar, "Център", new Vector2(x0, 0), new Vector2(110, H), () => orbit.ResetView()); x0 += 110 + G;
             UIKit.Btn fb = null;
             fb = UIKit.Button(bar, "Само 3D", new Vector2(x0, 0), new Vector2(122, H), () => { focus = !focus; fb.On = focus; ApplyFocus(); }); x0 += 122 + G;
+            // 2D schematic of the same running model (the web version's 2D view), over the 3D area
+            if (PhysioBridge.View2dHas(SelectedId)) { view2dBtn = UIKit.Button(bar, "2D схема", new Vector2(x0, 0), new Vector2(132, H), () => view2d?.Toggle()); x0 += 132 + G; }
             if (heart != null || lungs != null || organ != null || mirror != null)
             {
                 // opacity of the organs, 1–100 (100 = solid); the body journeys start as glass so the food stays visible
@@ -438,7 +441,10 @@ namespace MedAtlas.Sims
             if (mirror != null) SceneTools.Attach(gameObject, handle, mirror, orbit, picker, C);
             // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
             layout.SheetMode = true;
-            PhoneSheet.Attach(this, C, layout, orbit);
+            var phoneSheet = PhoneSheet.Attach(this, C, layout, orbit);
+            view2d = View2D.Attach(gameObject, handle, SelectedId, C, layout, phoneSheet, () => !paused, scenPanel, parPanel, learnPanel);
+            view2d.Changed = on2d => { if (view2dBtn != null) view2dBtn.On = on2d; };
+            if (View2D.Want) view2d.Set(true);
             LayoutCard();
         }
 

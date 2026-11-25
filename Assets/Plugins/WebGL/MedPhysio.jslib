@@ -72,6 +72,22 @@ mergeInto(LibraryManager.library, {
   MedPhysio_SceneTool: function (h, cmd, arg) {
     return stringToNewUTF8(window.MedPhysio.sceneTool(h, UTF8ToString(cmd), UTF8ToString(arg)) || '');
   },
+  // ---- 2D schematic mode (Tools/physio-bridge/view2d.ts)
+  MedPhysio_View2dHas: function (id) {
+    return (window.MedPhysio && window.MedPhysio.view2dHas) ? window.MedPhysio.view2dHas(UTF8ToString(id)) : 0;
+  },
+  MedPhysio_View2dOpen: function (h) {
+    return window.MedPhysio.view2dOpen(h);
+  },
+  MedPhysio_View2dRect: function (x, y, w, h) {
+    window.MedPhysio.view2dRect(x, y, w, h);
+  },
+  MedPhysio_View2dFrame: function (h, dt, playing) {
+    window.MedPhysio.view2dFrame(h, dt, playing);
+  },
+  MedPhysio_View2dClose: function () {
+    if (window.MedPhysio && window.MedPhysio.view2dClose) window.MedPhysio.view2dClose();
+  },
   // ---- muscle section (Tools/physio-bridge/muscle.ts)
   MedPhysio_MuscleOpen: function (tab, phone) {
     return window.MedPhysio.muscleOpen(UTF8ToString(tab), phone);
