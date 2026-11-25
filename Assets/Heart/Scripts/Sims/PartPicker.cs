@@ -57,6 +57,11 @@ namespace MedAtlas.Sims
         /// <summary>Called with the part id when a known part is tapped (the model may do an action for it).</summary>
         public System.Action<string> OnPart;
 
+        /// <summary>Parts (object names) that are picked by their box, label included, not only by their triangles:
+        /// small targets such as the thin auscultation rings, which a tap in the ring's middle would otherwise miss
+        /// (the web picks them by the ring and its letter label).</summary>
+        public readonly HashSet<string> BoxPick = new HashSet<string>();
+
         public static PartPicker Attach(GameObject host, Camera cam, Transform canvas, List<object> partsList)
         {
             var p = host.AddComponent<PartPicker>(); p.cam = cam; p.canvas = canvas;
@@ -145,8 +150,15 @@ namespace MedAtlas.Sims
             foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
             {
                 if (!(r is MeshRenderer) && !(r is SkinnedMeshRenderer)) continue;
-                if (r.gameObject.layer == 2) continue;   // Ignore Raycast: labels, particles and lines of the web scene
+                bool box = BoxPick.Count > 0 && BoxPick.Contains(r.gameObject.name);
+                if (r.gameObject.layer == 2 && !box) continue;   // Ignore Raycast: labels, particles and lines of the web scene
                 if (r.transform == halo || !r.enabled || !r.gameObject.activeInHierarchy || r.GetComponentInParent<Canvas>() != null) continue;
+                if (box)
+                {
+                    var bb = r.bounds; bb.Expand(bb.size.magnitude * 0.35f);   // a little slack around a small target
+                    if (bb.IntersectRay(ray, out float bd)) hits.Add((r, bd));
+                    continue;
+                }
                 if (!r.bounds.IntersectRay(ray)) continue;
                 if (HitMesh(r, ray, out float d)) hits.Add((r, d));
             }
@@ -192,7 +204,9 @@ namespace MedAtlas.Sims
             // size the card to its text and keep it inside the screen width
             var crt = (RectTransform)canvas;
             float w = Mathf.Min(720f, crt.rect.width - 32f);
-            float th = title.fontSize * 1.35f, lh = string.IsNullOrEmpty(l) ? 0 : latin.fontSize * 1.4f;
+            float lh = string.IsNullOrEmpty(l) ? 0 : latin.fontSize * 1.4f;
+            title.rectTransform.sizeDelta = new Vector2(w - 48, title.fontSize * 1.35f);
+            float th = Mathf.Max(title.fontSize * 1.35f, title.preferredHeight + 4);   // long names wrap onto a second line
             title.rectTransform.sizeDelta = new Vector2(w - 48, th); latin.rectTransform.sizeDelta = new Vector2(w - 48, lh);
             latin.rectTransform.anchoredPosition = new Vector2(24, -16 - th);
             body.rectTransform.sizeDelta = new Vector2(w - 48, 100);
@@ -200,7 +214,21 @@ namespace MedAtlas.Sims
             body.rectTransform.anchoredPosition = new Vector2(24, -22 - th - lh);
             card.sizeDelta = new Vector2(w, 22 + th + lh + bh + 22);
             card.SetAsLastSibling(); card.gameObject.SetActive(true);
-            picked = r; halo.gameObject.SetActive(true);
+            picked = r; halo.gameObject.SetActive(!CoversScreen(r.bounds));
+        }
+
+        // a big part (the skin of the whole body) would get a large halo box over the view: show only the card then
+        bool CoversScreen(Bounds b)
+        {
+            float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+            for (int i = 0; i < 8; i++)
+            {
+                var c = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                var sp = cam.WorldToScreenPoint(c); if (sp.z <= 0) return true;
+                x0 = Mathf.Min(x0, sp.x); y0 = Mathf.Min(y0, sp.y); x1 = Mathf.Max(x1, sp.x); y1 = Mathf.Max(y1, sp.y);
+            }
+            float w = Mathf.Min(x1, Screen.width) - Mathf.Max(x0, 0), h = Mathf.Min(y1, Screen.height) - Mathf.Max(y0, 0);
+            return w > 0 && h > 0 && w * h > 0.06f * Screen.width * Screen.height;
         }
 
         public void Hide() { if (card) card.gameObject.SetActive(false); if (halo) halo.gameObject.SetActive(false); picked = null; }

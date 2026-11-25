@@ -428,6 +428,8 @@ namespace MedAtlas.Sims
             // parts that also do something when tapped (the auscultation points move the stethoscope there), as on the web
             var partActs = def.ContainsKey("partActions") ? MiniJson.O(def["partActions"]) : null;
             if (partActs != null && partActs.Count > 0)
+                foreach (var k in partActs.Keys) picker.BoxPick.Add(k);
+            if (partActs != null && partActs.Count > 0)
                 picker.OnPart = pid => { if (partActs.TryGetValue(pid, out var a) && a is string act) PhysioBridge.Act(handle, act); };
             // phone held upright: the 3D fills the screen and a bottom sheet holds the rest (design "вариант Б")
             layout.SheetMode = true;
