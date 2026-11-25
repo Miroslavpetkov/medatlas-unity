@@ -237,6 +237,7 @@ namespace MedAtlas.Sims
         void FrameMirror(bool first)
         {
             if (mirror == null || !mirror.Fit(Mathf.Max(0.3f, cam.aspect), cam.fieldOfView, out var target, out var dist)) return;
+            dist *= 1.25f;   // the web fits an open view; here the info card and the charts cover part of it
             orbit.Target = target;
             orbit.SetView(SceneMirror.WebYaw, SceneMirror.WebPitch, dist);
             orbit.MinDistance = dist * 0.15f; orbit.MaxDistance = dist * 4f;
