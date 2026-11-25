@@ -60,6 +60,12 @@ mergeInto(LibraryManager.library, {
   MedPhysio_SceneFit: function (h, aspect, fov) {
     return stringToNewUTF8(window.MedPhysio.sceneFit(h, aspect, fov));
   },
+  MedPhysio_SceneCam: function (h, x, y, z) {
+    window.MedPhysio.sceneCam(h, x, y, z);
+  },
+  MedPhysio_LodBias: function (b) {
+    window.MedPhysio.lodBias(b);
+  },
   // ---- muscle section (Tools/physio-bridge/muscle.ts)
   MedPhysio_MuscleOpen: function (tab, phone) {
     return window.MedPhysio.muscleOpen(UTF8ToString(tab), phone);

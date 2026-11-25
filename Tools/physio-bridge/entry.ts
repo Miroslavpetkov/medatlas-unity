@@ -2,7 +2,8 @@
 import { PHYSIO as BASE } from '../medatlas/medAtlas-3D-main/src/physio/list/index';
 import { drugsFor } from '../medatlas/medAtlas-3D-main/src/physio/drugs';
 import { muscleOpen, muscleAct, muscleView, musclePart, muscleChart, muscleChartLen } from './muscle';
-import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit } from './mirror';
+import { mirrorBuild, mirrorDispose, mirrorFrame, mirrorFrameData, mirrorStructure, mirrorGeom, mirrorIndex, mirrorTex, mirrorFit, mirrorCam } from './mirror';
+import { setLodBias } from '../medatlas/medAtlas-3D-main/src/core/lod';
 
 // The web scenes load real anatomy (real/<topic>.bin, body/…) with relative URLs. The Unity page lives on another
 // path, so those requests go to the published web version (same origin on GitHub Pages, and it allows CORS).
@@ -113,6 +114,8 @@ const api = {
   sceneIndex: (h: number, gid: number, tri: number) => mirrorIndex(h, gid, !!tri),
   sceneTex: (h: number, tid: number) => mirrorTex(h, tid),
   sceneFit: (h: number, aspect: number, fov: number) => mirrorFit(h, aspect, fov),
+  sceneCam: (h: number, x: number, y: number, z: number) => mirrorCam(h, x, y, z),
+  lodBias: (b: number) => setLodBias(b),
   // the muscle section (#muscle on the web): its scene is mirrored under the returned handle
   muscleOpen: (tab: string, phone: number) => muscleOpen(tab, phone),
   muscleAct: (cmd: string, arg: string, phone: number) => muscleAct(cmd, arg, phone),

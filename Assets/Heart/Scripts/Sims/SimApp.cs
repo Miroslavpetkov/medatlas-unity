@@ -408,6 +408,9 @@ namespace MedAtlas.Sims
                 UIKit.Slider(box, new Vector2(104, 0), new Vector2(140, 20), 1, 100, start, v => { val.text = Mathf.RoundToInt(v).ToString(); ApplyOpacity(v / 100f); }, true);
                 x0 += 300 + G;
             }
+            // quality profile: Auto (from the device) → High → Medium → Low
+            UIKit.Btn qb = null;
+            qb = UIKit.Button(bar, "Качество: " + QualityProfile.Label(QualityProfile.Choice), new Vector2(x0, 0), new Vector2(176, H), () => { QualityProfile.Cycle(); qb.Text.text = "Качество: " + QualityProfile.Label(QualityProfile.Choice); }, 14); x0 += 176 + G;
             bar.sizeDelta = new Vector2(x0 + 4, 64);
 
             BuildScenarioPanel(); BuildParamPanel(); BuildLearnPanel();

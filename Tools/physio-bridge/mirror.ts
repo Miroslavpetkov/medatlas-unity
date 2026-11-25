@@ -14,6 +14,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import * as THREE from 'three';
+import { pickLods } from '../medatlas/medAtlas-3D-main/src/core/lod';
 
 type Obj = any;
 
@@ -42,6 +43,8 @@ interface Mirror {
   frameLen: number;
   geoms: Map<number, Obj>;
   texs: Map<number, Obj>;
+  /** Unity's camera in this scene's world (three.js coordinates), for the levels of detail. */
+  cam: THREE.Vector3 | null;
 }
 
 const mirrors: (Mirror | null)[] = [];
@@ -95,7 +98,7 @@ export function mirrorAdopt(h: number, built: any, opts: { dir?: number[]; margi
   mirrors[h] = {
     built, dir: d.map((v) => v / n), margin: opts.margin ?? 0.06, root: built.root, partOf, ids: new WeakMap(), next: 0, sig: '', ver: 0, nodes: [], kinds: [],
     geoVer: new Map(), texVer: new Map(), structure: '', frame: new Float32Array(4096), frameLen: 0,
-    geoms: new Map(), texs: new Map(),
+    geoms: new Map(), texs: new Map(), cam: null,
   };
 }
 
@@ -184,6 +187,8 @@ export function mirrorFrame(h: number, dt: number): number {
   if (!m) return 0;
   m.built.update(dt);
   m.root.updateMatrixWorld(true);
+  // heavy meshes show the level of detail Unity's camera would see (as the web viewer does before drawing)
+  if (m.cam) pickLods(m.root, m.cam);
 
   // nodes in draw order, and the structure signature
   const nodes: Obj[] = [];
@@ -498,4 +503,11 @@ export function mirrorFit(h: number, aspect: number, fovDeg: number): string {
   if (!(dist > 0)) return '[]';
   // the look direction in Unity axes, so Unity can turn its orbit camera the same way
   return JSON.stringify([c[0], c[1], -c[2], dist, dir[0], dir[1], -dir[2]]);
+}
+
+/** Where Unity's camera is, in the scene's three.js world coordinates. */
+export function mirrorCam(h: number, x: number, y: number, z: number): void {
+  const m = mirrors[h];
+  if (!m) return;
+  (m.cam ??= new THREE.Vector3()).set(x, y, z);
 }

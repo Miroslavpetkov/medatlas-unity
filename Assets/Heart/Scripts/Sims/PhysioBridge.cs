@@ -27,6 +27,8 @@ namespace MedAtlas.Sims
         [DllImport("__Internal")] static extern int MedPhysio_SceneIndex(int h, int gid, int tri, int[] dst, int cap);
         [DllImport("__Internal")] static extern int MedPhysio_SceneTex(int h, int tid, byte[] dst, int cap);
         [DllImport("__Internal")] static extern IntPtr MedPhysio_SceneFit(int h, float aspect, float fov);
+        [DllImport("__Internal")] static extern void MedPhysio_SceneCam(int h, float x, float y, float z);
+        [DllImport("__Internal")] static extern void MedPhysio_LodBias(float b);
 
         [DllImport("__Internal")] static extern int MedPhysio_MuscleOpen(string tab, int phone);
         [DllImport("__Internal")] static extern int MedPhysio_MuscleAct(string cmd, string arg, int phone);
@@ -55,6 +57,10 @@ namespace MedAtlas.Sims
         public static int SceneIndex(int h, int gid, bool tri, int[] dst) => MedPhysio_SceneIndex(h, gid, tri ? 1 : 0, dst, dst.Length);
         public static int SceneTex(int h, int tid, byte[] dst) => MedPhysio_SceneTex(h, tid, dst, dst.Length);
         public static string SceneFit(int h, float aspect, float fov) => Take(MedPhysio_SceneFit(h, aspect, fov));
+        /// <summary>Unity's camera in the scene (three.js world coordinates): heavy meshes pick their level of detail from it.</summary>
+        public static void SceneCam(int h, float x, float y, float z) => MedPhysio_SceneCam(h, x, y, z);
+        /// <summary>Below 1 the lighter levels of detail show sooner (Low quality profile).</summary>
+        public static void LodBias(float b) => MedPhysio_LodBias(b);
         // muscle section (MuscleApp.cs)
         public static int MuscleOpen(string tab, bool phone) => MedPhysio_MuscleOpen(tab ?? "", phone ? 1 : 0);
         public static int MuscleAct(string cmd, string arg, bool phone) => MedPhysio_MuscleAct(cmd, arg ?? "", phone ? 1 : 0);
@@ -80,6 +86,8 @@ namespace MedAtlas.Sims
         public static int SceneIndex(int h, int gid, bool tri, int[] dst) => 0;
         public static int SceneTex(int h, int tid, byte[] dst) => 0;
         public static string SceneFit(int h, float aspect, float fov) => "[]";
+        public static void SceneCam(int h, float x, float y, float z) { }
+        public static void LodBias(float b) { }
         public static int MuscleOpen(string tab, bool phone) => -1;
         public static int MuscleAct(string cmd, string arg, bool phone) => -1;
         public static string MuscleView() => "{}";
