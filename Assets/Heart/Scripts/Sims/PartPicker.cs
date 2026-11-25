@@ -57,6 +57,24 @@ namespace MedAtlas.Sims
         /// <summary>Called with the part id when a known part is tapped (the model may do an action for it).</summary>
         public System.Action<string> OnPart;
 
+        /// <summary>Called with the tapped object (any part, also those the model does not describe), and with null when
+        /// a tap hits nothing; `twice` is a second tap on the same object within 0.35 s (focus).</summary>
+        public System.Action<Renderer, bool> OnPicked;
+
+        /// <summary>Optional: a hit point the live section has cut away does not count.</summary>
+        public System.Func<Vector3, bool> Keep;
+        Renderer lastTap; float lastTapTime;
+        /// <summary>The part card (the tools bar sits under it).</summary>
+        public RectTransform Card => card;
+
+        /// <summary>Landscape: x of the card's centre on the canvas (the free 3D area between the side panels), not the screen centre.</summary>
+        public System.Func<float> CenterX;
+        /// <summary>Landscape: width of that free area (the tools bar is scaled down to fit it).</summary>
+        public System.Func<float> FreeWidth;
+
+        /// <summary>The name on the card of the last tapped part.</summary>
+        public string Title => title != null ? title.text : "";
+
         /// <summary>Parts (object names) that are picked by their box, label included, not only by their triangles:
         /// small targets such as the thin auscultation rings, which a tap in the ring's middle would otherwise miss
         /// (the web picks them by the ring and its letter label).</summary>
@@ -160,7 +178,7 @@ namespace MedAtlas.Sims
                     continue;
                 }
                 if (!r.bounds.IntersectRay(ray)) continue;
-                if (HitMesh(r, ray, out float d)) hits.Add((r, d));
+                if (HitMesh(r, ray, out float d) && (Keep == null || Keep(ray.GetPoint(d)))) hits.Add((r, d));
             }
             hits.Sort((a, b) => a.d.CompareTo(b.d));
             Renderer best = null; Renderer smallestGlass = null; float glassVol = float.MaxValue;
@@ -172,8 +190,11 @@ namespace MedAtlas.Sims
                 if (v < glassVol) { glassVol = v; smallestGlass = r; }
             }
             if (best == null) best = smallestGlass;
-            if (best == null) { Hide(); return; }
+            if (best == null) { Hide(); OnPicked?.Invoke(null, false); lastTap = null; return; }
+            bool twice = best == lastTap && Time.unscaledTime - lastTapTime < 0.35f;
+            lastTap = best; lastTapTime = Time.unscaledTime;
             Show(best);
+            OnPicked?.Invoke(best, twice);
         }
 
         void Show(Renderer r)
@@ -200,7 +221,7 @@ namespace MedAtlas.Sims
             // portrait phones scale the 1920-wide canvas down a lot: bigger type, and the card sits below the title
             bool portrait = Screen.height > Screen.width;
             title.fontSize = portrait ? 38 : 26; latin.fontSize = portrait ? 26 : 17; body.fontSize = portrait ? 27 : 17;
-            card.anchoredPosition = new Vector2(0, portrait ? -210 : -120);
+            card.anchoredPosition = new Vector2(portrait || CenterX == null ? 0 : CenterX(), portrait ? -210 : -120);
             // size the card to its text and keep it inside the screen width
             var crt = (RectTransform)canvas;
             float w = Mathf.Min(720f, crt.rect.width - 32f);

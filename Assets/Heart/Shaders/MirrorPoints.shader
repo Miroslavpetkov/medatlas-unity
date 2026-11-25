@@ -68,6 +68,7 @@ Shader "MedAtlas/MirrorPoints"
 
             half4 frag (Varyings i) : SV_Target
             {
+                MirClipTest(i.positionWS);
                 float r2 = dot(i.c, i.c);
                 clip(1.0 - r2);
                 float z = sqrt(saturate(1.0 - r2));

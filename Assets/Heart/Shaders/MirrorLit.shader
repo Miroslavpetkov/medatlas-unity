@@ -105,6 +105,7 @@ Shader "MedAtlas/MirrorLit"
             half4 frag (Varyings i, FRONT_FACE_TYPE face : FRONT_FACE_SEMANTIC) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(i);
+                MirClipTest(i.positionWS);
                 half3 albedo = _Color.rgb * i.color.rgb;
                 if (_HasTex > 0.5h) albedo *= SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv).rgb;
                 half3 col;
